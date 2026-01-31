@@ -302,3 +302,19 @@ function AuctionatorShoppingResultsRowMixin:OnClick(button, ...)
     end
   end
 end
+
+function AuctionatorShoppingResultsRowMixin:Populate(rowData, dataIndex)
+  -- Call parent Populate to set rowData and dataIndex
+  AuctionatorResultsRowTemplateMixin.Populate(self, rowData, dataIndex)
+
+  -- Reset all cell colors to white when row is recycled/reused
+  -- This ensures colors from previous purchases don't carry over
+  if self.cells then
+    for _, cell in ipairs(self.cells) do
+      if cell.text then
+        -- Reset to white text color
+        cell.text:SetTextColor(1, 1, 1, 1)
+      end
+    end
+  end
+end
