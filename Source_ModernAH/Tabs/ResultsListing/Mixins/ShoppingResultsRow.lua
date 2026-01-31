@@ -1,6 +1,6 @@
 AuctionatorShoppingResultsRowMixin = CreateFromMixins(AuctionatorResultsRowTemplateMixin)
-  
-local function debugtable(tab) 
+
+local function debugtable(tab)
   fprint("=====================================")
   fprint("SIZE:", #tab)
   fprint("{")
@@ -37,16 +37,19 @@ function PurchaseCommodity(row, itemID, quantity, price, cell)
     return false
   end
 
-  StartOneClickFlow({
+  -- Only set purchased to true if we successfully start the purchase
+  local flowData = {
     row = row,
     itemID = itemID,
     quantity = quantity,
     cell = cell,
     unitPrice = price,
     totalPrice = price * quantity
-  })
+  }
 
-  return true  
+  StartOneClickFlow(flowData)
+
+  return true
 end
 
 function StartOneClickFlow(data)
@@ -63,7 +66,7 @@ function StartOneClickFlow(data)
 
   fprint('unitPrice', Auctionator.Utilities.CreatePaddedMoneyString(purchasing.unitPrice))
   fprint('totalPrice', Auctionator.Utilities.CreatePaddedMoneyString(purchasing.totalPrice))
-  
+
   purchasing.cell.text:SetText("starting")
   purchasing.cell.text:SetTextColor(0.9, 0.9, 0.9, 1)
   C_AuctionHouse.StartCommoditiesPurchase(purchasing.itemID, purchasing.quantity)
@@ -91,7 +94,7 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
   local diffUnit = newUnitPrice - purchasing.unitPrice
   local diffTotal = newTotalPrice - purchasing.totalPrice
   local prDiff = diffUnit / purchasing.unitPrice * 100
-  
+
   fprint('prDiff', prDiff)
 
   local dsDiff = string.format("%.1f%%", prDiff)
@@ -100,7 +103,7 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
   end
 
   fprint('dsDiff', dsDiff)
-  
+
   if prDiff > 5 then
     fprint('newTotalPrice', Auctionator.Utilities.CreatePaddedMoneyString(newTotalPrice))
     fprint('diffTotal', Auctionator.Utilities.CreatePaddedMoneyString(diffTotal))
@@ -110,7 +113,11 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
     purchasing.cell.text:SetTextColor(1, 176/255, 0, 1)
 
     C_AuctionHouse.CancelCommoditiesPurchase()
-    purchasing.row.rowData.purchased = false
+
+    -- Reset the purchased flag to allow retries
+    if purchasing.row and purchasing.row.rowData then
+      purchasing.row.rowData.purchased = false
+    end
 
     toretry = purchasing
     purchasing = nil
@@ -118,7 +125,7 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
     fprint('=====================================')
     return
   end
-  
+
   fprint('new price is ok!')
 end
 
@@ -139,20 +146,17 @@ local function OnCommodityPriceUnavailableEvent(self, event)
   end
 
   purchasing.cell.text:SetText("unavailable")
-  purchasing = nil
-  
-  fprint('=====================================')
-end
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("COMMODITY_PRICE_UNAVAILABLE")
-f:SetScript("OnEvent", OnCommodityPriceUnavailableEvent)
+  -- Reset the purchased flag to allow user to retry or try another row
+  if purchasing.row and purchasing.row.rowData then
+    purchasing.row.rowData.purchased = false
+  end
 
 -- ============================================================================
 -- ON PURCHASE DROPPED
 -- ============================================================================
 
-local function OnPurchaseDroppedEvent(self, event)  
+local function OnPurchaseDroppedEvent(self, event)
   fprint('---------------')
   fprint('OnPurchaseDroppedEvent', event)
 
@@ -189,7 +193,7 @@ f:SetScript("OnEvent", OnReadyToConfirmPurchaseEvent)
 -- ON COMMODITY PURCHASE SUCCEEDED
 -- ============================================================================
 
-local function OnPurchaseCompletedEvent(self, event)  
+local function OnPurchaseCompletedEvent(self, event)
   fprint('---------------')
   fprint('OnPurchaseCompletedEvent', event)
 
@@ -199,9 +203,10 @@ local function OnPurchaseCompletedEvent(self, event)
 
   purchasing.cell.text:SetText("purchased")
   purchasing.cell.text:SetTextColor(139/255, 195/255, 74/255, 1)
-  purchasing.row.rowData.purchased = false
-  purchasing = nil
-  
+
+  -- Keep purchased flag as true to prevent further purchases on this row
+  -- (User should move to next row after successful purchase)
+
   fprint('=====================================')
 end
 
@@ -224,24 +229,21 @@ function AuctionatorShoppingResultsRowMixin:OnClick(button, ...)
       local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(self.rowData.itemKey)
       local quantity = self.rowData.purchaseQuantity or 1
       if itemKeyInfo.isCommodity then
-        
+
+        -- Prevent right-clicks if a purchase has already completed on this row
         if self.rowData.purchased then
+          return
+        end
+
+        -- Prevent right-clicks if another purchase is currently in progress
+        if purchasing then
+          fprint('Purchase already in progress')
           return
         end
 
         local cell = self.cells[5]
 
         local started = PurchaseCommodity(self, itemKeyInfo.itemID, quantity, self.rowData.minPrice, cell)
-        
-        if started then
-          self.rowData.purchased = true
-        end
-
-        return
-      end
-    end
-
-    Auctionator.EventBus
       :RegisterSource(self, "ShoppingResultsRowMixin")
       :Fire(self, Auctionator.Shopping.Tab.Events.ShowHistoricalPrices, self.rowData)
       :UnregisterSource(self)
