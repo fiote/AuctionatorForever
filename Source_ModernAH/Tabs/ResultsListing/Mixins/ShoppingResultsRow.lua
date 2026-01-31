@@ -114,9 +114,11 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
 
     C_AuctionHouse.CancelCommoditiesPurchase()
 
-    -- Reset the purchased flag to allow retries
+    -- Mark this row as prevented so SmartBuy knows it was attempted but failed
+    -- Keep purchased as true to prevent manual right-clicks, but mark as prevented for SmartBuy cycling
     if purchasing.row and purchasing.row.rowData then
-      purchasing.row.rowData.purchased = false
+      purchasing.row.rowData.purchased = true
+      purchasing.row.rowData.preventedPurchase = true
     end
 
     toretry = purchasing
@@ -147,10 +149,20 @@ local function OnCommodityPriceUnavailableEvent(self, event)
 
   purchasing.cell.text:SetText("unavailable")
 
-  -- Reset the purchased flag to allow user to retry or try another row
+  -- Reset both flags to allow user to retry or try another row
   if purchasing.row and purchasing.row.rowData then
     purchasing.row.rowData.purchased = false
+    purchasing.row.rowData.preventedPurchase = false
   end
+
+  purchasing = nil
+
+  fprint('=====================================')
+end
+
+local f = CreateFrame("Frame")
+f:RegisterEvent("COMMODITY_PRICE_UNAVAILABLE")
+f:SetScript("OnEvent", OnCommodityPriceUnavailableEvent)
 
 -- ============================================================================
 -- ON PURCHASE DROPPED
@@ -206,6 +218,13 @@ local function OnPurchaseCompletedEvent(self, event)
 
   -- Keep purchased flag as true to prevent further purchases on this row
   -- (User should move to next row after successful purchase)
+  if purchasing.row and purchasing.row.rowData then
+    -- Ensure purchased is explicitly set to true
+    purchasing.row.rowData.purchased = true
+    purchasing.row.rowData.preventedPurchase = false
+  end
+
+  purchasing = nil
 
   fprint('=====================================')
 end
@@ -232,6 +251,7 @@ function AuctionatorShoppingResultsRowMixin:OnClick(button, ...)
 
         -- Prevent right-clicks if a purchase has already completed on this row
         if self.rowData.purchased then
+          fprint('Row already purchased, skipping')
           return
         end
 
@@ -244,6 +264,12 @@ function AuctionatorShoppingResultsRowMixin:OnClick(button, ...)
         local cell = self.cells[5]
 
         local started = PurchaseCommodity(self, itemKeyInfo.itemID, quantity, self.rowData.minPrice, cell)
+
+        return
+      end
+    end
+
+    Auctionator.EventBus
       :RegisterSource(self, "ShoppingResultsRowMixin")
       :Fire(self, Auctionator.Shopping.Tab.Events.ShowHistoricalPrices, self.rowData)
       :UnregisterSource(self)

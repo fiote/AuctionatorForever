@@ -23,6 +23,12 @@ function AuctionatorShoppingTabSearchOptionsMixin:OnLoad()
     end
   end)
 
+  self.SmartBuyButton:SetScript("OnClick", function()
+    if self.onSmartBuy then
+      self.onSmartBuy()
+    end
+  end)
+
   Auctionator.EventBus:Register(self, {
     Auctionator.Shopping.Tab.Events.SearchStart,
     Auctionator.Shopping.Tab.Events.SearchEnd,
@@ -102,6 +108,10 @@ end
 
 function AuctionatorShoppingTabSearchOptionsMixin:SetOnMore(func)
   self.onMore = func
+end
+
+function AuctionatorShoppingTabSearchOptionsMixin:SetOnSmartBuy(func)
+  self.onSmartBuy = func
 end
 
 local function GetAppropriateText(searchTerm)

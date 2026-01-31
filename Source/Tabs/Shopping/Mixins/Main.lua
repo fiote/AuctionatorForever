@@ -228,6 +228,8 @@ function AuctionatorShoppingTabFrameMixin:SetupRecentsContainer()
 end
 
 function AuctionatorShoppingTabFrameMixin:SetupTopSearch()
+  self.lastPreventedRowRetried = nil
+
   self.SearchOptions:SetOnSearch(function(searchTerm)
     if self.searchRunning then
       self:StopSearch()
@@ -256,6 +258,87 @@ function AuctionatorShoppingTabFrameMixin:SetupTopSearch()
     self.ListsContainer:GetExpandedList():InsertItem(searchTerm)
     self.ListsContainer:ScrollToListEnd()
   end)
+
+  self.SearchOptions:SetOnSmartBuy(function()
+    self:SmartBuyNextRow()
+  end)
+end
+
+function AuctionatorShoppingTabFrameMixin:SmartBuyNextRow()
+  -- Find the first result row that hasn't been purchased yet and hasn't been prevented
+  local resultsList = self.ResultsListing
+  if not resultsList or not resultsList.ScrollArea or not resultsList.ScrollArea.ScrollBox then
+    return
+  end
+
+  -- Access all frames currently displayed in the scroll box
+  local scrollBox = resultsList.ScrollArea.ScrollBox
+  local normalRowFound = false
+
+  scrollBox:ForEachFrame(function(frame)
+    if not normalRowFound and frame.rowData then
+      -- Check if this is a commodity and not yet purchased, and not a prevented purchase
+      if not frame.rowData.purchased and not frame.rowData.preventedPurchase then
+        local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(frame.rowData.itemKey)
+        if itemKeyInfo and itemKeyInfo.isCommodity then
+          normalRowFound = true
+
+          -- Get the quantity and price from row data
+          local quantity = frame.rowData.purchaseQuantity or 1
+          local price = frame.rowData.minPrice
+
+          -- Get the cell for feedback display (typically column 5 or the status column)
+          local cell = frame.cells and frame.cells[5]
+          if cell then
+            -- Call PurchaseCommodity with the row and details
+            PurchaseCommodity(frame, itemKeyInfo.itemID, quantity, price, cell)
+          end
+        end
+      end
+    end
+  end)
+
+  -- If no normal unpurchased row was found, try to cycle through prevented purchases
+  if not normalRowFound then
+    self:TryBuyNextPreventedRow()
+  end
+end
+
+function AuctionatorShoppingTabFrameMixin:TryBuyNextPreventedRow()
+  local resultsList = self.ResultsListing
+  if not resultsList or not resultsList.ScrollArea or not resultsList.ScrollArea.ScrollBox then
+    return
+  end
+
+  local scrollBox = resultsList.ScrollArea.ScrollBox
+  local foundNextPrevented = false
+
+  -- First pass: find a prevented row that we haven't tried yet (or after the last one we tried)
+  scrollBox:ForEachFrame(function(frame)
+    if not foundNextPrevented and frame.rowData and frame.rowData.preventedPurchase then
+      -- Skip the one we just tried to cycle to the next
+      if self.lastPreventedRowRetried ~= frame.rowData then
+        foundNextPrevented = true
+        self.lastPreventedRowRetried = frame.rowData
+
+        local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(frame.rowData.itemKey)
+        if itemKeyInfo and itemKeyInfo.isCommodity then
+          local quantity = frame.rowData.purchaseQuantity or 1
+          local price = frame.rowData.minPrice
+          local cell = frame.cells and frame.cells[5]
+          if cell then
+            PurchaseCommodity(frame, itemKeyInfo.itemID, quantity, price, cell)
+          end
+        end
+      end
+    end
+  end)
+
+  -- If we didn't find a different prevented row (cycled through all), reset and try again from the beginning
+  if not foundNextPrevented then
+    self.lastPreventedRowRetried = nil
+    TryRetryPurchase()
+  end
 end
 
 function AuctionatorShoppingTabFrameMixin:GetAppropriateListSearchName()
