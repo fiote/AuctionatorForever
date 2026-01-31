@@ -1,6 +1,11 @@
 function Auctionator.API.v1.GetAuctionPriceByItemID(callerID, itemID)
   Auctionator.API.InternalVerifyID(callerID)
 
+  -- Convert string to number if needed
+  if type(itemID) == "string" then
+    itemID = tonumber(itemID)
+  end
+
   if type(itemID) ~= "number" then
     Auctionator.API.ComposeError(
       callerID,

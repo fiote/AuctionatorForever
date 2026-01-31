@@ -64,8 +64,10 @@ function AuctionatorGroupsViewItemMixin:UpdateTooltip()
     if Auctionator.Utilities.IsPetLink(self.itemInfo.itemLink) then
       BattlePetToolTip_ShowLink(self.itemInfo.itemLink)
     else
-      GameTooltip:SetHyperlink(self.itemInfo.itemLink)
-      GameTooltip:Show()
+      local success = pcall(GameTooltip.SetHyperlink, GameTooltip, self.itemInfo.itemLink)
+      if success then
+        GameTooltip:Show()
+      end
     end
   end
 end
