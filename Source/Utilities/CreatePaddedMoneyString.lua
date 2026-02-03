@@ -17,6 +17,10 @@ local leftPadding = " "
 local rightPadding = " "
 
 function Auctionator.Utilities.CreatePaddedMoneyString(amount)
+  if amount == nil then
+    amount = 0
+  end
+
   amount = math.floor(amount)
 
   local gold, silver, copper = getGold(amount), getSilver(amount), getCopper(amount)

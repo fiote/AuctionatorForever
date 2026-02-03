@@ -129,6 +129,10 @@ function AuctionatorIncrementalScanFrameMixin:AddPrices(results)
 end
 
 function AuctionatorIncrementalScanFrameMixin:NextStep()
+  if Auctionator == nil or Auctionator.Database == nil then
+    return
+  end
+
   if self.doingFullScan and not Auctionator.AH.HasFullBrowseResults() then
     Auctionator.AH.RequestMoreBrowseResults()
   else
