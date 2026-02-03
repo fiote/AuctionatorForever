@@ -391,7 +391,7 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
 end
 
 function AuctionatorShoppingTabFrameMixin:OnShow()
-  self.SearchOptions:FocusSearchBox()
+  -- self.SearchOptions:FocusSearchBox()
   Auctionator.EventBus:Register(self, EVENTBUS_EVENTS)
 
   if self.shouldDefaultOpenOnShow then
