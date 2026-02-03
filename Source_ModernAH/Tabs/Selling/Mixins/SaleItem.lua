@@ -902,6 +902,39 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   isCurrentlyPosting = false
 end
 
+function AuctionatorSaleItemMixin:Apply10PercentDiscount()
+  local currentPrice = self.Price:GetAmount()
+  if currentPrice > 0 then
+    -- Calculate 90% of current price and round up
+    local discountedPrice = math.ceil(currentPrice * 0.9)
+    -- Normalize the price to meet AH requirements
+    discountedPrice = NormalizePrice(discountedPrice)
+    self.Price:SetAmount(discountedPrice)
+  end
+end
+
+function AuctionatorSaleItemMixin:Apply5PercentDiscount()
+  local currentPrice = self.Price:GetAmount()
+  if currentPrice > 0 then
+    -- Calculate 95% of current price and round up
+    local discountedPrice = math.ceil(currentPrice * 0.95)
+    -- Normalize the price to meet AH requirements
+    discountedPrice = NormalizePrice(discountedPrice)
+    self.Price:SetAmount(discountedPrice)
+  end
+end
+
+function AuctionatorSaleItemMixin:Apply1PercentDiscount()
+  local currentPrice = self.Price:GetAmount()
+  if currentPrice > 0 then
+    -- Calculate 99% of current price and round up
+    local discountedPrice = math.ceil(currentPrice * 0.99)
+    -- Normalize the price to meet AH requirements
+    discountedPrice = NormalizePrice(discountedPrice)
+    self.Price:SetAmount(discountedPrice)
+  end
+end
+
 function AuctionatorSaleItemMixin:PostItem(confirmed)
   if not self:GetPostButtonState() then
     Auctionator.Debug.Message("Trying to post when we can't. Returning")
