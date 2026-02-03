@@ -142,10 +142,6 @@ function Auctionator.Variables.InitializeDatabase()
     end
   end)
 
-  -- Only deserialize the current realm and save the deserialization in the
-  -- saved variables to speed up reloads or changing character on the same
-  -- realm.
-  --]]
   -- Deserialize the current realm if it was left serialized by a previous
   -- version of Auctionator
   local raw = AUCTIONATOR_PRICE_DATABASE[realm]
@@ -156,7 +152,8 @@ function Auctionator.Variables.InitializeDatabase()
     else
       success, data = pcall(LibCBOR.Deserialize, LibCBOR, raw)
     end
-    if not success then
+    if not success or data == nil then
+      Auctionator.Debug.Message("Failed to deserialize CBOR data, resetting database")
       AUCTIONATOR_PRICE_DATABASE[realm] = {}
     else
       AUCTIONATOR_PRICE_DATABASE[realm] = data
@@ -165,36 +162,53 @@ function Auctionator.Variables.InitializeDatabase()
 
   -- Fix conversion error from old code
   if type(AUCTIONATOR_PRICE_DATABASE[realm]) ~= "table" then
+    Auctionator.Debug.Message("Realm data is not a table, resetting")
     AUCTIONATOR_PRICE_DATABASE[realm] = {}
   end
 
-  assert(AUCTIONATOR_PRICE_DATABASE[realm], "Realm data missing somehow")
+  -- Safeguard: Ensure realm data exists
+  if AUCTIONATOR_PRICE_DATABASE[realm] == nil then
+    AUCTIONATOR_PRICE_DATABASE[realm] = {}
+  end
 
-  for realm, realmData in pairs(AUCTIONATOR_PRICE_DATABASE) do
+  for realmName, realmData in pairs(AUCTIONATOR_PRICE_DATABASE) do
     if type(realmData) == "table" and realmData.version ~= 2 then
-      for key, itemData in pairs(realmData) do
-        if type(itemData) == "table" and itemData.pending then
-          for _, field in ipairs({"a", "h", "l"}) do
-            local new = {}
-            -- Make it valid JSON (legacy)
-            for day, data in pairs(itemData[field] or {}) do
-              new[tostring(day)] = data
+      local success = pcall(function()
+        for key, itemData in pairs(realmData) do
+          if type(itemData) == "table" and itemData.pending then
+            for _, field in ipairs({"a", "h", "l"}) do
+              local new = {}
+              -- Make it valid JSON (legacy)
+              for day, data in pairs(itemData[field] or {}) do
+                new[tostring(day)] = data
+              end
+              itemData[field] = new
             end
-            itemData[field] = new
+          elseif type(itemData) == "table" and itemData.pending then
+            itemData = itemData.old
           end
-        elseif type(itemData) == "table" and itemData.pending then
-          itemData = itemData.old
-        end
-        -- Reverse per-item CBOR format
-        if type(itemData) == "string" then
-          if C_EncodingUtil then
-            realmData[key] = C_EncodingUtil.DeserializeCBOR(itemData)
-          else
-            realmData[key] = LibCBOR:Deserialize(itemData)
+          -- Reverse per-item CBOR format
+          if type(itemData) == "string" then
+            local deserializeSuccess, deserializedData
+            if C_EncodingUtil then
+              deserializeSuccess, deserializedData = pcall(C_EncodingUtil.DeserializeCBOR, itemData)
+            else
+              deserializeSuccess, deserializedData = pcall(LibCBOR.Deserialize, LibCBOR, itemData)
+            end
+            if deserializeSuccess and deserializedData ~= nil then
+              realmData[key] = deserializedData
+            else
+              -- Remove corrupted item data
+              realmData[key] = nil
+            end
           end
         end
+        realmData.version = 2
+      end)
+      if not success then
+        Auctionator.Debug.Message("Failed to migrate realm data for " .. realmName .. ", resetting")
+        AUCTIONATOR_PRICE_DATABASE[realmName] = {}
       end
-      realmData.version = 2
     end
   end
 
