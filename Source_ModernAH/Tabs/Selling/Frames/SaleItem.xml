@@ -102,7 +102,7 @@
         </Scripts>
       </Button>
 
-      <Button parentKey="AutoLogicButton" name="AuctionatorAutoLogicButton" inherits="UIPanelButtonTemplate" text="10%Off">
+      <Button parentKey="Discount10Button" name="AuctionatorDiscount10Button" inherits="UIPanelButtonTemplate" text="10%Off">
         <Size x="60" y="22"/>
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="BOTTOMLEFT" x="20" y="70"/>
@@ -114,7 +114,7 @@
       <Button parentKey="Discount5Button" name="AuctionatorDiscount5Button" inherits="UIPanelButtonTemplate" text="5%Off">
         <Size x="60" y="22"/>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.AutoLogicButton" relativePoint="TOPRIGHT" x="5"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.Discount10Button" relativePoint="TOPRIGHT" x="5"/>
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():Apply5PercentDiscount()</OnClick>
@@ -127,6 +127,15 @@
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():Apply1PercentDiscount()</OnClick>
+        </Scripts>
+      </Button>
+      <Button parentKey="AutoLogicButton" name="AuctionatorAutoLogicButton" inherits="UIPanelButtonTemplate" text="Auto">
+        <Size x="60" y="22"/>
+        <Anchors>
+          <Anchor point="TOPLEFT" relativeKey="$parent.Discount1Button" relativePoint="TOPRIGHT" x="5"/>
+        </Anchors>
+        <Scripts>
+          <OnClick>self:GetParent():RunAutoLogic()</OnClick>
         </Scripts>
       </Button>
 
