@@ -771,7 +771,7 @@ f:RegisterEvent("AUCTION_HOUSE_THROTTLED_MESSAGE_SENT")
 f:RegisterEvent("AUCTION_HOUSE_THROTTLED_SYSTEM_READY")
 f:SetScript("OnEvent", OnCurrentlyPurchasingEvent)
 
-function MONEY(money)
+local function MONEY(money)
   if money == nil then return '0g' end
   return Auctionator.Utilities.CreatePaddedMoneyString(money, false, false)
 end
