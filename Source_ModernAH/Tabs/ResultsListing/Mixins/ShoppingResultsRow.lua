@@ -1,5 +1,46 @@
 AuctionatorShoppingResultsRowMixin = CreateFromMixins(AuctionatorResultsRowTemplateMixin)
 
+local SHOPPING_FONT_SIZE_DELTA = -1
+local SHOPPING_MONEY_SCALE = 0.95
+
+local function ApplyFontSizeDelta(fontString, delta)
+  if not fontString then
+    return
+  end
+
+  local fontPath, currentSize, flags = fontString:GetFont()
+  if not fontPath or not currentSize then
+    return
+  end
+
+  if fontString._AuctionatorShoppingBaseSize == nil then
+    fontString._AuctionatorShoppingBaseSize = currentSize
+  end
+
+  local targetSize = math.max(6, fontString._AuctionatorShoppingBaseSize + delta)
+  if currentSize ~= targetSize then
+    fontString:SetFont(fontPath, targetSize, flags)
+  end
+end
+
+local function ApplyShoppingRowFontSizing(row)
+  if not row or not row.cells then
+    return
+  end
+
+  for _, cell in ipairs(row.cells) do
+    ApplyFontSizeDelta(cell and cell.text, SHOPPING_FONT_SIZE_DELTA)
+    ApplyFontSizeDelta(cell and cell.Text, SHOPPING_FONT_SIZE_DELTA)
+
+    if cell and cell.MoneyDisplay then
+      if cell.MoneyDisplay._AuctionatorShoppingBaseScale == nil then
+        cell.MoneyDisplay._AuctionatorShoppingBaseScale = cell.MoneyDisplay:GetScale()
+      end
+      cell.MoneyDisplay:SetScale(cell.MoneyDisplay._AuctionatorShoppingBaseScale * SHOPPING_MONEY_SCALE)
+    end
+  end
+end
+
 local function debugtable(tab)
   fprint("=====================================")
   fprint("SIZE:", #tab)
@@ -308,6 +349,7 @@ end
 function AuctionatorShoppingResultsRowMixin:Populate(rowData, dataIndex)
   -- Call parent Populate to set rowData and dataIndex
   AuctionatorResultsRowTemplateMixin.Populate(self, rowData, dataIndex)
+  ApplyShoppingRowFontSizing(self)
 
   -- Reset all cell colors to white when row is recycled/reused
   -- This ensures colors from previous purchases don't carry over
