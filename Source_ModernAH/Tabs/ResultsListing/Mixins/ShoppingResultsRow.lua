@@ -114,8 +114,9 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
 
     C_AuctionHouse.CancelCommoditiesPurchase()
 
-    -- Mark this row as prevented so SmartBuy knows it was attempted but failed
-    -- Keep purchased as true to prevent manual right-clicks, but mark as prevented for SmartBuy cycling
+    -- Mark this row as prevented so SmartBuy knows it was attempted but failed.
+    -- Keep purchased true to avoid being treated as a normal unpurchased row by SmartBuy;
+    -- manual right-click retries are allowed when preventedPurchase is true.
     if purchasing.row and purchasing.row.rowData then
       purchasing.row.rowData.purchased = true
       purchasing.row.rowData.preventedPurchase = true
@@ -249,8 +250,9 @@ function AuctionatorShoppingResultsRowMixin:OnClick(button, ...)
       local quantity = self.rowData.purchaseQuantity or 1
       if itemKeyInfo.isCommodity then
 
-        -- Prevent right-clicks if a purchase has already completed on this row
-        if self.rowData.purchased then
+        -- Prevent right-clicks only for completed purchases.
+        -- Rows marked as preventedPurchase should be retryable.
+        if self.rowData.purchased and not self.rowData.preventedPurchase then
           fprint('Row already purchased, skipping')
           return
         end
