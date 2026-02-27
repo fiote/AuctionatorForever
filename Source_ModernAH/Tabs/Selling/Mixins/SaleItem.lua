@@ -30,6 +30,58 @@ local function IsEquipment(itemInfo)
   return not itemInfo.isCommodity and Auctionator.Utilities.IsEquipment(itemInfo.classId)
 end
 
+local function RequiresSingleVariantPost(itemInfo)
+  return itemInfo ~= nil and IsEquipment(itemInfo) and itemInfo.hasItemIDVariants == true
+end
+
+local function GetVariantPostingLocations(itemInfo)
+  if not itemInfo then
+    return {}
+  end
+
+  if itemInfo.locations and #itemInfo.locations > 0 then
+    return itemInfo.locations
+  end
+
+  if itemInfo.location then
+    return { itemInfo.location }
+  end
+
+  return {}
+end
+
+local function GetVariantLocationPostCount(itemInfo)
+  if not itemInfo or not itemInfo.location or not C_Item.DoesItemExist(itemInfo.location) then
+    return 0
+  end
+
+  if not C_AuctionHouse.IsSellItemValid(itemInfo.location, false) then
+    return 0
+  end
+
+  return math.max(0, C_AuctionHouse.GetAvailablePostCount(itemInfo.location) or 0)
+end
+
+local function SelectBestVariantLocation(itemInfo)
+  local bestLocation = itemInfo and itemInfo.location
+  local bestCount = 0
+  if bestLocation and C_Item.DoesItemExist(bestLocation) and C_AuctionHouse.IsSellItemValid(bestLocation, false) then
+    bestCount = math.max(0, C_AuctionHouse.GetAvailablePostCount(bestLocation) or 0)
+  end
+
+  for _, location in ipairs(GetVariantPostingLocations(itemInfo)) do
+    if location and C_Item.DoesItemExist(location) and C_AuctionHouse.IsSellItemValid(location, false) then
+      local availableCount = math.max(0, C_AuctionHouse.GetAvailablePostCount(location) or 0)
+      if availableCount > bestCount then
+        bestCount = availableCount
+        bestLocation = location
+      end
+    end
+  end
+
+  return bestLocation
+end
+
 local function IsValidItem(item)
   return item ~= nil and
     -- May be a favourite with no items available, ignore it.
@@ -173,6 +225,9 @@ function AuctionatorSaleItemMixin:OnUpdate()
 end
 
 function AuctionatorSaleItemMixin:GetPostLimit()
+  if RequiresSingleVariantPost(self.itemInfo) then
+    return math.min(self.itemInfo.count, GetVariantLocationPostCount(self.itemInfo))
+  end
   return math.min(C_AuctionHouse.GetAvailablePostCount(self.itemInfo.location), self.itemInfo.count)
 end
 function AuctionatorSaleItemMixin:SetMax()
@@ -207,6 +262,22 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
     Auctionator.AH.GetItemKeyInfo(C_AuctionHouse.MakeItemKey(itemInfo.itemID), function(itemKeyInfo)
       self.itemInfo = itemInfo
       self.itemInfo.isCommodity = itemKeyInfo.isCommodity
+      if self.itemInfo.sortKey and Auctionator.Groups and Auctionator.Groups.Utilities and Auctionator.Groups.Utilities.HasItemIDVariants then
+        self.itemInfo.hasItemIDVariants = Auctionator.Groups.Utilities.HasItemIDVariants(self.itemInfo.itemID, self.itemInfo.sortKey)
+        if self.itemInfo.hasItemIDVariants and (not self.itemInfo.locations or #self.itemInfo.locations == 0) and Auctionator.Groups.Utilities.QueryItem then
+          local groupedInfo = Auctionator.Groups.Utilities.QueryItem(self.itemInfo.sortKey)
+          if groupedInfo then
+            self.itemInfo.locations = groupedInfo.locations
+            self.itemInfo.count = groupedInfo.itemCount
+          end
+        end
+        if self.itemInfo.hasItemIDVariants then
+          local bestLocation = SelectBestVariantLocation(self.itemInfo)
+          if bestLocation then
+            self.itemInfo.location = bestLocation
+          end
+        end
+      end
       self.nextItem = self.itemInfo and self.itemInfo.nextItem
       self.prevItem = self.itemInfo and self.itemInfo.prevItem
       self.lastKey = self.itemInfo and self.itemInfo.key
