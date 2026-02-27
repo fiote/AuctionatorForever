@@ -52,6 +52,10 @@ function AuctionatorShoppingTabDataProviderMixin:OnLoad()
   AuctionatorItemKeyLoadingMixin.OnLoad(self)
 end
 
+function AuctionatorShoppingTabDataProviderMixin:ShouldDisplayGearQualityIcon()
+  return true
+end
+
 function AuctionatorShoppingTabDataProviderMixin:SetUpEvents()
   Auctionator.EventBus:RegisterSource(self, "Shopping List Data Provider")
 
