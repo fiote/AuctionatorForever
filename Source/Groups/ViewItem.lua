@@ -1,5 +1,111 @@
 AuctionatorGroupsViewItemMixin = {}
 
+local TRACK_TO_QUALITY_TIER = {
+  [970] = 1, -- Explorer
+  [971] = 2, -- Adventurer
+  [972] = 3, -- Veteran
+  [973] = 4, -- Champion
+  [974] = 5, -- Hero
+}
+
+local PROFESSION_EQUIP_LOCS = {
+  INVTYPE_PROFESSION_TOOL = true,
+  INVTYPE_PROFESSION_GEAR = true,
+}
+
+local function IsProfessionEquipmentItem(itemID, itemLink)
+  local _, _, _, equipLoc = C_Item.GetItemInfoInstant(itemLink or itemID)
+  return equipLoc ~= nil and PROFESSION_EQUIP_LOCS[equipLoc] == true
+end
+
+local function GetTrackQualityTier(itemLink)
+  if not itemLink or not C_Item.GetItemUpgradeInfo then
+    return nil
+  end
+
+  local itemUpgradeData = C_Item.GetItemUpgradeInfo(itemLink)
+  local trackID = itemUpgradeData and itemUpgradeData.trackStringID
+  return trackID and TRACK_TO_QUALITY_TIER[trackID]
+end
+
+local function GetProfessionLinkQualityTier(itemLink)
+  if not itemLink then
+    return nil
+  end
+
+  local qualityTier
+  if string.find(itemLink, "Quality%-12%-Tier") then
+    qualityTier = string.match(itemLink, "Quality%-12%-Tier(%d+)")
+  else
+    qualityTier = string.match(itemLink, "Quality%-Tier(%d+)")
+  end
+
+  return tonumber(qualityTier)
+end
+
+local function GetProfessionItemLevelQualityTier(itemLevel)
+  if not itemLevel then
+    return nil
+  end
+
+  if itemLevel >= 206 then
+    return 5
+  elseif itemLevel >= 199 then
+    return 4
+  elseif itemLevel >= 192 then
+    return 3
+  elseif itemLevel >= 186 then
+    return 2
+  elseif itemLevel >= 183 then
+    return 2
+  elseif itemLevel >= 180 then
+    return 1
+  end
+
+  return nil
+end
+
+local function GetReagentQualityTier(itemID, itemLink)
+  if not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+    return nil
+  end
+
+  local quality
+  if itemID then
+    quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
+  end
+  if not quality and itemLink then
+    quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemLink)
+  end
+
+  return quality
+end
+
+local function GetDisplayQualityTier(itemInfo)
+  if not Auctionator.Constants.IsRetail or not itemInfo then
+    return nil
+  end
+
+  local classID = itemInfo.classID or itemInfo.classId
+  local isProfessionEquipment = IsProfessionEquipmentItem(itemInfo.itemID, itemInfo.itemLink)
+  local isProfessionEntry = classID == Enum.ItemClass.Profession
+
+  if not (isProfessionEntry or isProfessionEquipment) then
+    return nil
+  end
+
+  local qualityTier = GetTrackQualityTier(itemInfo.itemLink)
+    or GetProfessionLinkQualityTier(itemInfo.itemLink)
+    or GetProfessionItemLevelQualityTier(itemInfo.itemLevel)
+    or GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)
+
+  if qualityTier and qualityTier >= 1 and qualityTier <= 5 then
+    return qualityTier
+  end
+
+  return nil
+end
+
 function AuctionatorGroupsViewItemMixin:SetClickEvent(eventName)
   self.clickEventName = eventName
 end
@@ -32,7 +138,7 @@ function AuctionatorGroupsViewItemMixin:SetItemInfo(info)
 
     self.Text:SetText(info.itemCount)
 
-    self:ApplyQualityIcon(info.itemLink)
+    self:ApplyQualityIcon(info)
 
   else
     self.IconBorder:Hide()
@@ -95,24 +201,22 @@ function AuctionatorGroupsViewItemMixin:OnClick(button)
   end
 end
 
--- Adds Dragonflight (10.0) crafting quality icon for reagents on retail only
-function AuctionatorGroupsViewItemMixin:ApplyQualityIcon(itemLink)
-  if C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityByItemInfo then
-    local quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemLink)
-    if quality ~= nil then
-      if not self.ProfessionQualityOverlay then
-        self.ProfessionQualityOverlay = self:CreateTexture(nil, "OVERLAY");
-        self.ProfessionQualityOverlay:SetPoint("TOPLEFT", -2, 2);
-        self.ProfessionQualityOverlay:SetDrawLayer("OVERLAY", 7);
-      end
-      self.ProfessionQualityOverlay:Show()
-
-      local atlas = ("Professions-Icon-Quality-Tier%d-Inv"):format(quality);
-      self.ProfessionQualityOverlay:SetAtlas(atlas, TextureKitConstants.UseAtlasSize);
-    else
-      self:HideQualityIcon()
-    end
+function AuctionatorGroupsViewItemMixin:ApplyQualityIcon(itemInfo)
+  local qualityTier = GetDisplayQualityTier(itemInfo)
+  if qualityTier == nil then
+    self:HideQualityIcon()
+    return
   end
+
+  if not self.ProfessionQualityOverlay then
+    self.ProfessionQualityOverlay = self:CreateTexture(nil, "OVERLAY")
+    self.ProfessionQualityOverlay:SetPoint("TOPLEFT", -2, 2)
+    self.ProfessionQualityOverlay:SetDrawLayer("OVERLAY", 7)
+  end
+  self.ProfessionQualityOverlay:Show()
+
+  local atlas = ("Professions-Icon-Quality-Tier%d-Inv"):format(qualityTier)
+  self.ProfessionQualityOverlay:SetAtlas(atlas, TextureKitConstants.UseAtlasSize)
 end
 
 function AuctionatorGroupsViewItemMixin:HideQualityIcon()
