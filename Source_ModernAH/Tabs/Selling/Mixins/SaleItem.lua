@@ -503,6 +503,7 @@ function AuctionatorSaleItemMixin:ProcessCommodityResults(itemID, ...)
   end
 
   self.priceThreshold = self:GetCommodityThreshold(itemID)
+  self.cheapestCommodityResult = result
 
   if result == nil then
     return
@@ -902,37 +903,45 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   isCurrentlyPosting = false
 end
 
-function AuctionatorSaleItemMixin:Apply10PercentDiscount()
+function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
+  -- Do not apply discount if the cheapest price is from the current character
+  if self.cheapestCommodityResult and self.cheapestCommodityResult.containsOwnerItem and self.cheapestCommodityResult.owners[1] == "player" then
+    return
+  end
+
+	local itemKey = self.expectedItemKey
+
+	if C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
+  	local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
+		local isOwner = result.containsOwnerItem and result.owners[1] == "player"
+		if isOwner then
+			return
+		end
+	end
+
   local currentPrice = self.Price:GetAmount()
   if currentPrice > 0 then
-    -- Calculate 90% of current price and round up
-    local discountedPrice = math.ceil(currentPrice * 0.9)
+    -- Calculate the discounted price and round up
+    local discountedPrice = math.ceil(currentPrice * multiplier)
     -- Normalize the price to meet AH requirements
     discountedPrice = NormalizePrice(discountedPrice)
     self.Price:SetAmount(discountedPrice)
   end
+end
+
+function AuctionatorSaleItemMixin:Apply10PercentDiscount()
+  self:ApplyPercentDiscount(0.9)
+  self:PostItem()
 end
 
 function AuctionatorSaleItemMixin:Apply5PercentDiscount()
-  local currentPrice = self.Price:GetAmount()
-  if currentPrice > 0 then
-    -- Calculate 95% of current price and round up
-    local discountedPrice = math.ceil(currentPrice * 0.95)
-    -- Normalize the price to meet AH requirements
-    discountedPrice = NormalizePrice(discountedPrice)
-    self.Price:SetAmount(discountedPrice)
-  end
+  self:ApplyPercentDiscount(0.95)
+  self:PostItem()
 end
 
 function AuctionatorSaleItemMixin:Apply1PercentDiscount()
-  local currentPrice = self.Price:GetAmount()
-  if currentPrice > 0 then
-    -- Calculate 99% of current price and round up
-    local discountedPrice = math.ceil(currentPrice * 0.99)
-    -- Normalize the price to meet AH requirements
-    discountedPrice = NormalizePrice(discountedPrice)
-    self.Price:SetAmount(discountedPrice)
-  end
+  self:ApplyPercentDiscount(0.99)
+  self:PostItem()
 end
 
 function AuctionatorSaleItemMixin:PostItem(confirmed)
