@@ -31,7 +31,26 @@ local function GetItemKey(entry)
   if entry.classID == Enum.ItemClass.Battlepet then
     itemLevel = Auctionator.Utilities.GetPetLevelFromLink(entry.itemLink)
   end
-  return entry.itemID .. "_" ..  entry.itemName .. "_" .. itemLevel .. "_" .. entry.quality .. "_" ..  tostring(entry.auctionable)
+  return entry.itemID .. "_" .. entry.itemName .. "_" .. itemLevel .. "_" .. entry.quality .. "_" .. tostring(entry.auctionable) .. "_" .. (entry.statSignature or "")
+end
+
+local function BuildItemStatSignature(itemLink)
+  if not itemLink or not C_Item.GetItemStats then
+    return ""
+  end
+
+  local stats = C_Item.GetItemStats(itemLink)
+  if not stats then
+    return ""
+  end
+
+  local signatureParts = {}
+  for statName, statValue in pairs(stats) do
+    table.insert(signatureParts, statName .. ":" .. tostring(statValue))
+  end
+  table.sort(signatureParts)
+
+  return table.concat(signatureParts, ";")
 end
 
 function AuctionatorBagCacheMixin:PostUpdate(bagContents)
@@ -170,6 +189,7 @@ function AuctionatorBagCacheMixin:CacheLinkInfo(suppliedItemLink, callback)
         else
           entry.itemLevel = C_Item.GetDetailedItemLevelInfo(entry.itemLink)
         end
+        entry.statSignature = BuildItemStatSignature(entry.itemLink)
       end
       linkInstantCache[suppliedItemLink] = entry
       callback()
@@ -287,6 +307,7 @@ function AuctionatorBagCacheMixin:AddToCache(location, slotInfo)
     entry.stackCount = savedDetails.stackCount
     entry.itemLevel = savedDetails.itemLevel
     entry.quality = savedDetails.quality
+    entry.statSignature = savedDetails.statSignature
   else
     if entry.itemLink:match("battlepet:") then
       entry.classID = Enum.ItemClass.Battlepet
@@ -309,6 +330,7 @@ function AuctionatorBagCacheMixin:AddToCache(location, slotInfo)
       else
         entry.itemLevel = C_Item.GetDetailedItemLevelInfo(entry.itemLink)
       end
+      entry.statSignature = BuildItemStatSignature(entry.itemLink)
     end
     detailsCache[entry.itemLink] = entry
   end
