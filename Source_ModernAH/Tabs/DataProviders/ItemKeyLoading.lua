@@ -87,7 +87,7 @@ function AuctionatorItemKeyLoadingMixin:ShouldDisplayGearQualityIcon()
   return false
 end
 
-function AuctionatorItemKeyLoadingMixin:GetGearQualityMarkup(rowEntry)
+function AuctionatorItemKeyLoadingMixin:GetGearQualityTier(rowEntry)
   if not self:ShouldDisplayGearQualityIcon() then
     return nil
   end
@@ -109,9 +109,17 @@ function AuctionatorItemKeyLoadingMixin:GetGearQualityMarkup(rowEntry)
   end
 
   if qualityTier and qualityTier >= 1 and qualityTier <= 5 then
-    return Auctionator.Utilities.GetCraftingQualityMarkup(qualityTier)
+    return qualityTier
   end
 
+  return nil
+end
+
+function AuctionatorItemKeyLoadingMixin:GetGearQualityMarkup(rowEntry)
+  local qualityTier = self:GetGearQualityTier(rowEntry)
+  if qualityTier then
+    return Auctionator.Utilities.GetCraftingQualityMarkup(qualityTier)
+  end
   return nil
 end
 
@@ -136,17 +144,20 @@ function AuctionatorItemKeyLoadingMixin:ProcessItemKey(rowEntry, itemKeyInfo)
   )
   local itemID = rowEntry.itemKey and rowEntry.itemKey.itemID
   local isEquipment = itemID and IsEquipmentItem(itemID)
+  rowEntry.gearQualityTier = nil
 
   if isEquipment then
     text = itemKeyInfo.itemName or text
-    local gearIcon = self:GetGearQualityMarkup(rowEntry)
-    if gearIcon then
-      text = text .. " " .. gearIcon
-    end
+    rowEntry.gearQualityTier = self:GetGearQualityTier(rowEntry)
 
     local itemLevel = rowEntry.itemKey and rowEntry.itemKey.itemLevel
     if itemLevel and itemLevel > 0 then
       text = AUCTIONATOR_L_ITEM_NAME_X_ITEM_LEVEL_X:format(text, itemLevel)
+    end
+
+    local quality = itemKeyInfo and itemKeyInfo.quality
+    if quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality] then
+      text = ITEM_QUALITY_COLORS[quality].color:WrapTextInColorCode(text)
     end
   else
     local nonEquipmentIcon = GetLegacyCraftingQualityMarkup(itemID)

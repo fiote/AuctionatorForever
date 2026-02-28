@@ -2,6 +2,38 @@ AuctionatorShoppingResultsRowMixin = CreateFromMixins(AuctionatorResultsRowTempl
 
 local SHOPPING_FONT_SIZE_DELTA = -1
 local SHOPPING_MONEY_SCALE = 0.95
+local SHOPPING_GEAR_ICON_SCALE = 0.5
+local SHOPPING_GEAR_ICON_RIGHT_OFFSET = -8
+
+local function EnsureRowGearQualityOverlay(row)
+  if row.GearQualityRowOverlay then
+    return
+  end
+
+  row.GearQualityRowOverlay = row:CreateTexture(nil, "OVERLAY", nil, 7)
+  row.GearQualityRowOverlay:SetPoint("RIGHT", row, "RIGHT", SHOPPING_GEAR_ICON_RIGHT_OFFSET, 0)
+  row.GearQualityRowOverlay:Hide()
+end
+
+local function ApplyRowGearQualityOverlay(row, qualityTier)
+  EnsureRowGearQualityOverlay(row)
+
+  if qualityTier and qualityTier >= 1 and qualityTier <= 5 then
+    local atlas = ("Professions-ChatIcon-Quality-Tier%d"):format(qualityTier)
+    row.GearQualityRowOverlay:SetAtlas(atlas, TextureKitConstants and TextureKitConstants.UseAtlasSize or true)
+
+    local width, height = row.GearQualityRowOverlay:GetSize()
+    if width and height and width > 0 and height > 0 then
+      row.GearQualityRowOverlay:SetSize(width * SHOPPING_GEAR_ICON_SCALE, height * SHOPPING_GEAR_ICON_SCALE)
+    end
+
+    row.GearQualityRowOverlay:ClearAllPoints()
+    row.GearQualityRowOverlay:SetPoint("RIGHT", row, "RIGHT", SHOPPING_GEAR_ICON_RIGHT_OFFSET, 0)
+    row.GearQualityRowOverlay:Show()
+  else
+    row.GearQualityRowOverlay:Hide()
+  end
+end
 
 local function ApplyFontSizeDelta(fontString, delta)
   if not fontString then
@@ -350,6 +382,7 @@ function AuctionatorShoppingResultsRowMixin:Populate(rowData, dataIndex)
   -- Call parent Populate to set rowData and dataIndex
   AuctionatorResultsRowTemplateMixin.Populate(self, rowData, dataIndex)
   ApplyShoppingRowFontSizing(self)
+  ApplyRowGearQualityOverlay(self, rowData and rowData.gearQualityTier)
 
   -- Reset all cell colors to white when row is recycled/reused
   -- This ensures colors from previous purchases don't carry over
