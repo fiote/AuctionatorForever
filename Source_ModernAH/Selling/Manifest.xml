@@ -2,6 +2,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
   <Include file="Events.lua" />
   <Include file="Hooks.lua" />
+  <Script file="CraftSimIntegration.lua"/>
 
   <Script file="ItemPrice.lua"/>
   <Script file="ComposeAuctionPostedMessage.lua"/>

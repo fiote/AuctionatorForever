@@ -281,6 +281,7 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
       self.nextItem = self.itemInfo and self.itemInfo.nextItem
       self.prevItem = self.itemInfo and self.itemInfo.prevItem
       self.lastKey = self.itemInfo and self.itemInfo.key
+      Auctionator.Selling.TrySelectOpenProfessionRecipe(self.itemInfo and self.itemInfo.itemID)
       self:LockItem()
       self:Update()
     end)
