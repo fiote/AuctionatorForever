@@ -27,11 +27,17 @@ function AuctionatorBagCacheMixin:OnEvent(eventName, ...)
 end
 
 local function GetItemKey(entry)
+  local useStatSignature = Auctionator.Config.Get(Auctionator.Config.Options.SELLING_SPLIT_BY_STAT_SIGNATURE)
+  local statSignature = ""
+  if useStatSignature then
+    statSignature = entry.statSignature or ""
+  end
+
   local itemLevel = entry.itemLevel or 0
   if entry.classID == Enum.ItemClass.Battlepet then
     itemLevel = Auctionator.Utilities.GetPetLevelFromLink(entry.itemLink)
   end
-  return entry.itemID .. "_" .. entry.itemName .. "_" .. itemLevel .. "_" .. entry.quality .. "_" .. tostring(entry.auctionable) .. "_" .. (entry.statSignature or "")
+  return entry.itemID .. "_" .. entry.itemName .. "_" .. itemLevel .. "_" .. entry.quality .. "_" .. tostring(entry.auctionable) .. "_" .. statSignature
 end
 
 local function BuildItemStatSignature(itemLink)

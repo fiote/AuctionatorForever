@@ -21,6 +21,12 @@ function AuctionatorBagUseMixin:OnShow()
     if self.pendingKey then
       self:ReturnItem(self.pendingKey)
       self.pendingKey = nil
+    elseif self.pendingItemID then
+      local itemID = self.pendingItemID
+      self.pendingItemID = nil
+      if not self:SelectFirstItemByID(itemID) then
+        Auctionator.EventBus:Fire(self, Auctionator.Selling.Events.ClearBagItem)
+      end
     end
   end, self)
   Auctionator.Groups.CallbackRegistry:TriggerEvent("BagCacheOn")
@@ -28,6 +34,7 @@ end
 
 function AuctionatorBagUseMixin:OnHide()
   self.View:SetSelected(nil)
+  self.pendingItemID = nil
   Auctionator.Groups.CallbackRegistry:UnregisterCallback("BagUse.BagItemClicked", self)
   Auctionator.Groups.CallbackRegistry:UnregisterCallback("BagUse.AddToDefaultGroup", self)
   Auctionator.Groups.CallbackRegistry:UnregisterCallback("BagUse.RemoveFromDefaultGroup", self)
@@ -45,6 +52,35 @@ function AuctionatorBagUseMixin:ReturnItem(key)
   end
 end
 
+function AuctionatorBagUseMixin:SelectFirstItemByID(itemID)
+  for _, group in ipairs(self.View.groups) do
+    for _, button in ipairs(group.buttons) do
+      if button.itemInfo and
+         button.itemInfo.itemID == itemID and
+         button.itemInfo.itemCount > 0 and
+         button.itemInfo.auctionable then
+        button:Click()
+        return true
+      end
+    end
+  end
+  return false
+end
+
+function AuctionatorBagUseMixin:RefreshForGroupingChange(itemID)
+  self.pendingKey = nil
+  self.pendingItemID = itemID
+  self.awaitingCompletion = true
+
+  if self.View and self.View.RefreshHiddenItems then
+    self.View:RefreshHiddenItems()
+  end
+
+  if AuctionatorBagCacheFrame then
+    AuctionatorBagCacheFrame:DoBagRefresh()
+  end
+end
+
 function AuctionatorBagUseMixin:ReceiveEvent(eventName, info, ...)
   if eventName == Auctionator.Selling.Events.BagItemRequest then
     if self.awaitingCompletion then
@@ -57,7 +93,7 @@ function AuctionatorBagUseMixin:ReceiveEvent(eventName, info, ...)
       self.View:SetSelected(info.key)
       self.View:ScrollToSelected()
     end
-  elseif eventName == Auctionator.Selling.Events.BagItemClear then
+  elseif eventName == Auctionator.Selling.Events.ClearBagItem then
     self.View:SetSelected(nil)
   end
 end

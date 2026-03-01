@@ -189,6 +189,7 @@ AUCTIONATOR_LOCALES.enUS = function()
 
   L["SELLING_TAB"] = "Selling"
   L["SELLING_TAB_HEADER"] = "Auctionator - Selling"
+  L["SPLIT_BY_STATS"] = "Split"
 
   L["CANCELLING_TAB"] = "Cancelling"
   L["CANCELLING_TAB_HEADER"] = "Auctionator - Cancelling"

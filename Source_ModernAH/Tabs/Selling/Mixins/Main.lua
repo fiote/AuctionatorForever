@@ -15,12 +15,17 @@ function AuctionatorSellingTabMixin:OnLoad()
   self.PostingHistoryListing:Init(self.PostingHistoryProvider)
 
   self.CurrentPricesListing:Init(self.CurrentPricesProvider)
+
+  self.SplitByStatsToggle:SetChecked(Auctionator.Config.Get(Auctionator.Config.Options.SELLING_SPLIT_BY_STAT_SIGNATURE))
 end
 
 function AuctionatorSellingTabMixin:ApplyHiding()
   if not Auctionator.Config.Get(Auctionator.Config.Options.SHOW_SELLING_BAG) then
     self.BagListing:Hide()
     self.BagInset:Hide()
+    if self.SplitByStatsToggle then
+      self.SplitByStatsToggle:Hide()
+    end
     self.CurrentPricesListing:SetPoint("LEFT", self, "LEFT", 10, -5)
     self.PricesTabsContainer.CurrentPricesTab:ClearAllPoints()
     self.PricesTabsContainer.PriceHistoryTab:ClearAllPoints()
@@ -46,6 +51,21 @@ function AuctionatorSellingTabMixin:ApplyHiding()
     self.CurrentPricesInset = CreateFrame("Frame", nil, self, "AuctionatorInsetDarkTemplate")
     self.CurrentPricesInset:SetPoint("TOPLEFT", self.CurrentPricesListing, -5, -24)
     self.CurrentPricesInset:SetPoint("BOTTOMRIGHT", self.CurrentPricesListing, 0, 2)
+  end
+end
+
+function AuctionatorSellingTabMixin:OnSplitByStatsToggleClicked()
+  local splitByStats = self.SplitByStatsToggle:GetChecked()
+  local selectedItemID = self.SaleItemFrame and self.SaleItemFrame.itemInfo and self.SaleItemFrame.itemInfo.itemID
+
+  Auctionator.Config.Set(Auctionator.Config.Options.SELLING_SPLIT_BY_STAT_SIGNATURE, splitByStats)
+
+  if self.BagListing and Auctionator.EventBus:IsSourceRegistered(self.BagListing) then
+    Auctionator.EventBus:Fire(self.BagListing, Auctionator.Selling.Events.ClearBagItem)
+  end
+
+  if self.BagListing and self.BagListing.RefreshForGroupingChange then
+    self.BagListing:RefreshForGroupingChange(selectedItemID)
   end
 end
 

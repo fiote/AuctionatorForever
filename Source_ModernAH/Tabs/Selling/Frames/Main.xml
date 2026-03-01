@@ -32,6 +32,25 @@
         </Anchors>
       </Frame>
 
+      <CheckButton inherits="UICheckButtonTemplate" parentKey="SplitByStatsToggle">
+        <Size x="20" y="20" />
+        <Anchors>
+          <Anchor point="BOTTOMLEFT" relativeKey="$parent.BagListing" relativePoint="TOPLEFT" x="-4" y="6" />
+        </Anchors>
+        <Layers>
+          <Layer level="BACKGROUND">
+            <FontString inherits="GameFontHighlightSmall" text="AUCTIONATOR_L_SPLIT_BY_STATS">
+              <Anchors>
+                <Anchor point="LEFT" relativePoint="RIGHT" x="2" />
+              </Anchors>
+            </FontString>
+          </Layer>
+        </Layers>
+        <Scripts>
+          <OnClick>self:GetParent():OnSplitByStatsToggleClicked()</OnClick>
+        </Scripts>
+      </CheckButton>
+
       <Frame parentKey="BagInset" inherits="AuctionatorInsetTemplate">
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.BagListing" x="-5" y="5"/>
