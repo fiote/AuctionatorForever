@@ -97,6 +97,24 @@ function Auctionator.DatabaseMixin:GetFirstPrice(dbKeys)
   return nil
 end
 
+function Auctionator.DatabaseMixin:GetMostRecentDay(dbKey)
+  local itemData = self.db[dbKey]
+
+  if type(itemData) ~= "table" or type(itemData.h) ~= "table" then
+    return nil
+  end
+
+  local mostRecentDay = nil
+  for day, _ in pairs(itemData.h) do
+    local numericDay = tonumber(day)
+    if numericDay ~= nil and (mostRecentDay == nil or numericDay > mostRecentDay) then
+      mostRecentDay = numericDay
+    end
+  end
+
+  return mostRecentDay
+end
+
 --Takes all the items with a list of their prices, and determines the minimum
 --price.
 function Auctionator.DatabaseMixin:ProcessScan(itemIndexes)

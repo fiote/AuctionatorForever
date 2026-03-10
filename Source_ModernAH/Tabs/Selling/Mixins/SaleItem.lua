@@ -574,6 +574,9 @@ function AuctionatorSaleItemMixin:ProcessCommodityResults(itemID, ...)
   if result ~= nil then
     for _, key in ipairs(dbKeys) do
       Auctionator.Database:SetPrice(key, result.unitPrice)
+      if Auctionator.GlobalDatabase ~= nil then
+        Auctionator.GlobalDatabase:SetPrice(key, result.unitPrice)
+      end
     end
   end
   if self.itemInfo ~= nil then
@@ -1094,6 +1097,9 @@ function AuctionatorSaleItemMixin:PostItem(confirmed)
     Auctionator.Utilities.DBKeyFromLink(self.itemInfo.itemLink, function(dbKeys)
       for _, key in ipairs(dbKeys) do
         Auctionator.Database:SetPrice(key, priceToSave)
+        if self.itemInfo.isCommodity and Auctionator.GlobalDatabase ~= nil then
+          Auctionator.GlobalDatabase:SetPrice(key, priceToSave)
+        end
       end
       -- Refresh history listing after the new price is saved
       Auctionator.EventBus:Fire(self, Auctionator.Selling.Events.RefreshHistory)

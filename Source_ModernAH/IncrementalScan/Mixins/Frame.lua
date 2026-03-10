@@ -6,6 +6,15 @@ local INCREMENTAL_SCAN_EVENTS = {
   "AUCTION_HOUSE_CLOSED"
 }
 
+local function IsCommodityResult(resultInfo)
+  if Auctionator.GlobalDatabase == nil or resultInfo == nil then
+    return false
+  end
+
+  local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(resultInfo.itemKey)
+  return itemKeyInfo ~= nil and itemKeyInfo.isCommodity == true
+end
+
 function AuctionatorIncrementalScanFrameMixin:OnLoad()
   Auctionator.Debug.Message("AuctionatorIncrementalScanFrameMixin:OnLoad")
   Auctionator.EventBus:RegisterSource(self, "AuctionatorIncrementalScanFrameMixin")
@@ -31,6 +40,7 @@ end
 function AuctionatorIncrementalScanFrameMixin:OnEvent(event, ...)
   if event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" then
     self.info = {} -- New search results so reset info
+    self.globalInfo = {}
     self.rawScan = {}
 
     local browseResults = C_AuctionHouse.GetBrowseResults()
@@ -104,9 +114,14 @@ end
 function AuctionatorIncrementalScanFrameMixin:AddPrices(results)
   Auctionator.Debug.Message("AuctionatorIncrementalScanFrameMixin:AddPrices()", results)
 
+  if self.globalInfo == nil then
+    self.globalInfo = {}
+  end
+
   for _, resultInfo in ipairs(results) do
     if resultInfo.totalQuantity ~= 0 then
       local allDBKeys = Auctionator.Utilities.DBKeyFromBrowseResult(resultInfo)
+      local commodityResult = IsCommodityResult(resultInfo)
 
       for index, dbKey in ipairs(allDBKeys) do
         if self.info[dbKey] == nil then
@@ -116,6 +131,16 @@ function AuctionatorIncrementalScanFrameMixin:AddPrices(results)
         table.insert(self.info[dbKey],
           { price = resultInfo.minPrice, available = resultInfo.totalQuantity }
         )
+
+        if commodityResult then
+          if self.globalInfo[dbKey] == nil then
+            self.globalInfo[dbKey] = {}
+          end
+
+          table.insert(self.globalInfo[dbKey],
+            { price = resultInfo.minPrice, available = resultInfo.totalQuantity }
+          )
+        end
       end
       if self.doingFullScan then
         table.insert(self.rawScan, resultInfo)
@@ -137,9 +162,13 @@ function AuctionatorIncrementalScanFrameMixin:NextStep()
     Auctionator.AH.RequestMoreBrowseResults()
   else
     local count = Auctionator.Database:ProcessScan(self.info)
+    if Auctionator.GlobalDatabase ~= nil then
+      Auctionator.GlobalDatabase:ProcessScan(self.globalInfo or {})
+    end
     local rawScan = self.rawScan
 
     self.info = {} --Already processed, so clear
+    self.globalInfo = {}
     self.rawScan = {}
 
     if self.doingFullScan then

@@ -13,11 +13,11 @@ function Auctionator.API.v1.GetAuctionPriceByItemID(callerID, itemID)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
-  return Auctionator.Database:GetPrice(tostring(itemID))
+  return Auctionator.API.v1.GetPreferredPriceForDBKey(tostring(itemID))
 end
 
 function Auctionator.API.v1.GetAuctionPriceByItemLink(callerID, itemLink)
@@ -30,7 +30,7 @@ function Auctionator.API.v1.GetAuctionPriceByItemLink(callerID, itemLink)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
@@ -42,9 +42,15 @@ function Auctionator.API.v1.GetAuctionPriceByItemLink(callerID, itemLink)
   end)
 
   if dbKeys then
-    return Auctionator.Database:GetFirstPrice(dbKeys)
+    for _, dbKey in ipairs(dbKeys) do
+      local price = Auctionator.API.v1.GetPreferredPriceForDBKey(dbKey)
+      if price ~= nil then
+        return price
+      end
+    end
+    return nil
   else
-    return Auctionator.Database:GetPrice(
+    return Auctionator.API.v1.GetPreferredPriceForDBKey(
       Auctionator.Utilities.BasicDBKeyFromLink(itemLink)
     )
   end
@@ -65,11 +71,11 @@ function Auctionator.API.v1.GetAuctionEntryByItemID(callerID, itemID)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
-  return Auctionator.Database.db[tostring(itemID)]
+  return Auctionator.API.v1.GetPreferredEntryForDBKey(tostring(itemID))
 end
 
 function Auctionator.API.v1.GetAuctionEntryByItemLink(callerID, itemLink)
@@ -82,7 +88,7 @@ function Auctionator.API.v1.GetAuctionEntryByItemLink(callerID, itemLink)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
@@ -95,15 +101,15 @@ function Auctionator.API.v1.GetAuctionEntryByItemLink(callerID, itemLink)
 
   if dbKeys then
     for _, dbKey in ipairs(dbKeys) do
-      local entry = Auctionator.Database.db[dbKey]
+      local entry = Auctionator.API.v1.GetPreferredEntryForDBKey(dbKey)
       if entry then
         return entry
       end
     end
     return nil
   else
-    return Auctionator.Database.db[
+    return Auctionator.API.v1.GetPreferredEntryForDBKey(
       Auctionator.Utilities.BasicDBKeyFromLink(itemLink)
-    ]
+    )
   end
 end

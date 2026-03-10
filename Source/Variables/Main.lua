@@ -91,6 +91,10 @@ function Auctionator.Variables.InitializeDatabase()
     }
   end
 
+  if AUCTIONATOR_PRICE_DATABASE_GLOBAL == nil then
+    AUCTIONATOR_PRICE_DATABASE_GLOBAL = {}
+  end
+
   local LibCBOR = LibStub("LibCBOR-1.0")
 
   if AUCTIONATOR_PRICE_DATABASE["__dbversion"] == VERSION_8_3 then
@@ -171,6 +175,11 @@ function Auctionator.Variables.InitializeDatabase()
     AUCTIONATOR_PRICE_DATABASE[realm] = {}
   end
 
+  if type(AUCTIONATOR_PRICE_DATABASE_GLOBAL) ~= "table" then
+    Auctionator.Debug.Message("Global data is not a table, resetting")
+    AUCTIONATOR_PRICE_DATABASE_GLOBAL = {}
+  end
+
   for realmName, realmData in pairs(AUCTIONATOR_PRICE_DATABASE) do
     if type(realmData) == "table" and realmData.version ~= 2 then
       local success = pcall(function()
@@ -214,8 +223,10 @@ function Auctionator.Variables.InitializeDatabase()
 
   if Auctionator.Config.Get(Auctionator.Config.Options.NO_PRICE_DATABASE) then
     Auctionator.Database = CreateAndInitFromMixin(Auctionator.DatabaseMixin, {})
+    Auctionator.GlobalDatabase = CreateAndInitFromMixin(Auctionator.DatabaseMixin, {})
   else
     Auctionator.Database = CreateAndInitFromMixin(Auctionator.DatabaseMixin, AUCTIONATOR_PRICE_DATABASE[realm])
+    Auctionator.GlobalDatabase = CreateAndInitFromMixin(Auctionator.DatabaseMixin, AUCTIONATOR_PRICE_DATABASE_GLOBAL)
   end
 end
 

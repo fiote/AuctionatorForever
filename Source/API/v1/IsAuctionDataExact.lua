@@ -8,11 +8,11 @@ function Auctionator.API.v1.IsAuctionDataExactByItemID(callerID, itemID)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
-  return Auctionator.Database:GetPrice(tostring(itemID)) ~= nil
+  return Auctionator.API.v1.HasPreferredPriceForDBKey(tostring(itemID))
 end
 
 function Auctionator.API.v1.IsAuctionDataExactByItemLink(callerID, itemLink)
@@ -25,7 +25,7 @@ function Auctionator.API.v1.IsAuctionDataExactByItemLink(callerID, itemLink)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return false
   end
 
@@ -37,14 +37,15 @@ function Auctionator.API.v1.IsAuctionDataExactByItemLink(callerID, itemLink)
   end)
 
   if dbKeys then
-    if #dbKeys > 2 then
-      return Auctionator.Database:GetPrice(dbKeys[1]) ~= nil or Auctionator.Database:GetPrice(dbKeys[2]) ~= nil
-    else
-      return Auctionator.Database:GetPrice(dbKeys[1]) ~= nil
+    for _, dbKey in ipairs(dbKeys) do
+      if Auctionator.API.v1.HasPreferredPriceForDBKey(dbKey) then
+        return true
+      end
     end
+    return false
   else
-    return Auctionator.Database:GetPrice(
+    return Auctionator.API.v1.HasPreferredPriceForDBKey(
       Auctionator.Utilities.BasicDBKeyFromLink(itemLink)
-    ) ~= nil
+    )
   end
 end

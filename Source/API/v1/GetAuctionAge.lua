@@ -11,11 +11,11 @@ function Auctionator.API.v1.GetAuctionAgeByItemID(callerID, itemID)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
-  return Auctionator.Database:GetPriceAge(tostring(itemID))
+  return Auctionator.API.v1.GetPreferredPriceAgeForDBKey(tostring(itemID))
 end
 
 function Auctionator.API.v1.GetAuctionAgeByItemLink(callerID, itemLink)
@@ -28,7 +28,7 @@ function Auctionator.API.v1.GetAuctionAgeByItemLink(callerID, itemLink)
     )
   end
 
-  if Auctionator.Database == nil then
+  if Auctionator.Database == nil and Auctionator.GlobalDatabase == nil then
     return nil
   end
 
@@ -40,13 +40,15 @@ function Auctionator.API.v1.GetAuctionAgeByItemLink(callerID, itemLink)
   end)
 
   if dbKeys then
-    if #dbKeys > 2 then
-      return Auctionator.Database:GetPriceAge(dbKeys[1]) or Auctionator.Database:GetPriceAge(dbKeys[2])
-    else
-      return Auctionator.Database:GetPriceAge(dbKeys[1])
+    for _, dbKey in ipairs(dbKeys) do
+      local age = Auctionator.API.v1.GetPreferredPriceAgeForDBKey(dbKey)
+      if age ~= nil then
+        return age
+      end
     end
+    return nil
   else
-    return Auctionator.Database:GetPriceAge(
+    return Auctionator.API.v1.GetPreferredPriceAgeForDBKey(
       Auctionator.Utilities.BasicDBKeyFromLink(itemLink)
     )
   end

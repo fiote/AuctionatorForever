@@ -40,6 +40,7 @@ function Auctionator.SlashCmd.ResetDatabase()
   if Auctionator.Debug.IsOn() then
     -- See Source/Variables/Main.lua for variable usage
     AUCTIONATOR_PRICE_DATABASE = nil
+    AUCTIONATOR_PRICE_DATABASE_GLOBAL = nil
     Auctionator.Utilities.Message("Price database reset")
     Auctionator.Variables.InitializeDatabase()
   else
@@ -66,6 +67,7 @@ function Auctionator.SlashCmd.NoPriceDB()
   Auctionator.Config.Set(Auctionator.Config.Options.NO_PRICE_DATABASE, true)
 
   AUCTIONATOR_PRICE_DATABASE = nil
+  AUCTIONATOR_PRICE_DATABASE_GLOBAL = nil
   Auctionator.Variables.InitializeDatabase()
 
   Auctionator.Utilities.Message("Disabled recording auction prices in the price database.")
