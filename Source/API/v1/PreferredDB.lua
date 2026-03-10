@@ -42,6 +42,24 @@ function Auctionator.API.v1.GetPreferredPriceAgeForDBKey(dbKey)
   return database:GetPriceAge(dbKey)
 end
 
+function Auctionator.API.v1.GetPreferredPriceTimestampForDBKey(dbKey)
+  local database = GetPreferredDatabase(dbKey)
+  if database == nil then
+    return nil
+  end
+
+  return database:GetPriceTimestamp(dbKey)
+end
+
+function Auctionator.API.v1.GetPreferredPriceAgeSecondsForDBKey(dbKey)
+  local database = GetPreferredDatabase(dbKey)
+  if database == nil then
+    return nil
+  end
+
+  return database:GetPriceAgeSeconds(dbKey)
+end
+
 function Auctionator.API.v1.HasPreferredPriceForDBKey(dbKey)
   return Auctionator.API.v1.GetPreferredPriceForDBKey(dbKey) ~= nil
 end

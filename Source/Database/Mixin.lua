@@ -18,12 +18,14 @@ function Auctionator.DatabaseMixin:SetPrice(dbKey, buyoutPrice, available)
       l={}, -- Lowest low price on a given day
       h={}, -- Highest low price on a given day
       a={}, -- Highest quantity seen on a given day
-      m=0   -- Last seen minimum price
+      m=0,  -- Last seen minimum price
+      s=0   -- Last seen unix timestamp (seconds)
     }
   end
 
   local priceData = self.db[dbKey]
   priceData.m = buyoutPrice
+  priceData.s = time()
 
   -- Record price history
   local lowestLow  = priceData.l[daysSinceZero]
@@ -82,6 +84,15 @@ end
 function Auctionator.DatabaseMixin:GetPrice(dbKey)
   if self.db[dbKey] ~= nil then
     return self.db[dbKey].m
+  else
+    return nil
+  end
+end
+
+function Auctionator.DatabaseMixin:GetPriceTimestamp(dbKey)
+  local entry = self.db[dbKey]
+  if entry ~= nil then
+    return entry.s
   else
     return nil
   end
@@ -201,6 +212,15 @@ function Auctionator.DatabaseMixin:GetPriceAge(dbKey)
   table.sort(days)
 
   return GetScanDay()-days[#days]
+end
+
+function Auctionator.DatabaseMixin:GetPriceAgeSeconds(dbKey)
+  local timestamp = self:GetPriceTimestamp(dbKey)
+  if timestamp == nil then
+    return nil
+  end
+
+  return math.max(0, time() - timestamp)
 end
 
 function Auctionator.DatabaseMixin:GetMeanPrice(dbKey, days)
