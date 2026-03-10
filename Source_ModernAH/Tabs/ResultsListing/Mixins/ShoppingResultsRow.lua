@@ -1,7 +1,5 @@
 AuctionatorShoppingResultsRowMixin = CreateFromMixins(AuctionatorResultsRowTemplateMixin)
 
-local SHOPPING_FONT_SIZE_DELTA = -1
-local SHOPPING_MONEY_SCALE = 0.95
 local SHOPPING_GEAR_ICON_SCALE = 0.5
 local SHOPPING_GEAR_ICON_RIGHT_OFFSET = -8
 
@@ -32,44 +30,6 @@ local function ApplyRowGearQualityOverlay(row, qualityTier)
     row.GearQualityRowOverlay:Show()
   else
     row.GearQualityRowOverlay:Hide()
-  end
-end
-
-local function ApplyFontSizeDelta(fontString, delta)
-  if not fontString then
-    return
-  end
-
-  local fontPath, currentSize, flags = fontString:GetFont()
-  if not fontPath or not currentSize then
-    return
-  end
-
-  if fontString._AuctionatorShoppingBaseSize == nil then
-    fontString._AuctionatorShoppingBaseSize = currentSize
-  end
-
-  local targetSize = math.max(6, fontString._AuctionatorShoppingBaseSize + delta)
-  if currentSize ~= targetSize then
-    fontString:SetFont(fontPath, targetSize, flags)
-  end
-end
-
-local function ApplyShoppingRowFontSizing(row)
-  if not row or not row.cells then
-    return
-  end
-
-  for _, cell in ipairs(row.cells) do
-    ApplyFontSizeDelta(cell and cell.text, SHOPPING_FONT_SIZE_DELTA)
-    ApplyFontSizeDelta(cell and cell.Text, SHOPPING_FONT_SIZE_DELTA)
-
-    if cell and cell.MoneyDisplay then
-      if cell.MoneyDisplay._AuctionatorShoppingBaseScale == nil then
-        cell.MoneyDisplay._AuctionatorShoppingBaseScale = cell.MoneyDisplay:GetScale()
-      end
-      cell.MoneyDisplay:SetScale(cell.MoneyDisplay._AuctionatorShoppingBaseScale * SHOPPING_MONEY_SCALE)
-    end
   end
 end
 
@@ -381,7 +341,6 @@ end
 function AuctionatorShoppingResultsRowMixin:Populate(rowData, dataIndex)
   -- Call parent Populate to set rowData and dataIndex
   AuctionatorResultsRowTemplateMixin.Populate(self, rowData, dataIndex)
-  ApplyShoppingRowFontSizing(self)
   ApplyRowGearQualityOverlay(self, rowData and rowData.gearQualityTier)
 
   -- Reset all cell colors to white when row is recycled/reused
