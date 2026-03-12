@@ -87,17 +87,19 @@ local function GetDisplayQualityTier(itemInfo)
   end
 
   local classID = itemInfo.classID or itemInfo.classId
+  local isEquipment = classID ~= nil and Auctionator.Utilities.IsEquipment(classID)
   local isProfessionEquipment = IsProfessionEquipmentItem(itemInfo.itemID, itemInfo.itemLink)
   local isProfessionEntry = classID == Enum.ItemClass.Profession
 
-  if not (isProfessionEntry or isProfessionEquipment) then
-    return nil
+  local qualityTier
+  if isProfessionEntry or isProfessionEquipment then
+    qualityTier = GetTrackQualityTier(itemInfo.itemLink)
+      or GetProfessionLinkQualityTier(itemInfo.itemLink)
+      or GetProfessionItemLevelQualityTier(itemInfo.itemLevel)
+      or GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)
+  elseif not isEquipment then
+    qualityTier = GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)
   end
-
-  local qualityTier = GetTrackQualityTier(itemInfo.itemLink)
-    or GetProfessionLinkQualityTier(itemInfo.itemLink)
-    or GetProfessionItemLevelQualityTier(itemInfo.itemLevel)
-    or GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)
 
   if qualityTier and qualityTier >= 1 and qualityTier <= 5 then
     return qualityTier
