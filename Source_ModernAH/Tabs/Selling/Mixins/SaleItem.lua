@@ -236,18 +236,31 @@ end
 
 function AuctionatorSaleItemMixin:GetDeposit()
   local deposit = 0
+  local duration = self:GetDuration()
+
+  if duration == nil then
+    local selectedDuration = self.Duration:GetValue() or Auctionator.Config.Get(Auctionator.Config.Options.AUCTION_DURATION)
+
+    if selectedDuration == 12 then
+      duration = 1
+    elseif selectedDuration == 24 then
+      duration = 2
+    elseif selectedDuration == 48 then
+      duration = 3
+    end
+  end
 
   if C_AuctionHouse.GetItemCommodityStatus(self.itemInfo.location) == Enum.ItemCommodityStatus.Commodity then
     deposit = C_AuctionHouse.CalculateCommodityDeposit(
       self.itemInfo.itemID,
-      self:GetDuration(),
+      duration,
       self.Quantity:GetNumber()
     ) or deposit
 
   else
     deposit = C_AuctionHouse.CalculateItemDeposit(
       self.itemInfo.location,
-      self:GetDuration(),
+      duration,
       self.Quantity:GetNumber()
     ) or deposit
   end

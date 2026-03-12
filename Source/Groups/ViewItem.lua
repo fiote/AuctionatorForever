@@ -108,8 +108,55 @@ local function GetDisplayQualityTier(itemInfo)
   return nil
 end
 
+local function GetExpiredSinceLastSale(itemLink)
+  if Auctionator.Selling == nil or
+     Auctionator.Selling.TSMAccounting == nil or
+     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) ~= "function" then
+    return 0
+  end
+
+  return Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(itemLink) or 0
+end
+
 function AuctionatorGroupsViewItemMixin:SetClickEvent(eventName)
   self.clickEventName = eventName
+end
+
+function AuctionatorGroupsViewItemMixin:EnsureTSMExpiredText()
+  if self.TSMExpiredText ~= nil then
+    return
+  end
+
+  local text = self:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+  text:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 3, 3)
+  text:SetSize(22, 18)
+  text:SetJustifyH("LEFT")
+  text:SetShadowColor(0, 0, 0, 1)
+  text:SetShadowOffset(1, -1)
+  self.TSMExpiredText = text
+end
+
+function AuctionatorGroupsViewItemMixin:UpdateTSMExpiredText(info)
+  if self.clickEventName ~= "BagUse.BagItemClicked" or info == nil then
+    if self.TSMExpiredText ~= nil then
+      self.TSMExpiredText:Hide()
+    end
+    return
+  end
+
+  self:EnsureTSMExpiredText()
+
+  local expiredCount = GetExpiredSinceLastSale(info.itemLink)
+  if expiredCount > 10 then
+    self.TSMExpiredText:SetTextColor(1, 0.45, 0)
+  elseif expiredCount >= 1 then
+    self.TSMExpiredText:SetTextColor(1, 0.82, 0)
+  else
+    self.TSMExpiredText:SetTextColor(0.7, 0.7, 0.7)
+  end
+
+  self.TSMExpiredText:SetText(expiredCount)
+  self.TSMExpiredText:Show()
 end
 
 function AuctionatorGroupsViewItemMixin:SetItemInfo(info)
@@ -141,6 +188,7 @@ function AuctionatorGroupsViewItemMixin:SetItemInfo(info)
     self.Text:SetText(info.itemCount)
 
     self:ApplyQualityIcon(info)
+    self:UpdateTSMExpiredText(info)
 
   else
     self.IconBorder:Hide()
@@ -149,6 +197,7 @@ function AuctionatorGroupsViewItemMixin:SetItemInfo(info)
     self:SetAlpha(1)
 
     self:HideQualityIcon()
+    self:UpdateTSMExpiredText(nil)
   end
 
   self.initializationTime = GetTime()
