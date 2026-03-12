@@ -855,7 +855,7 @@ f:SetScript("OnEvent", OnCurrentlyPurchasingEvent)
 
 local function MONEY(money)
   if money == nil then return '0g' end
-  return Auctionator.Utilities.CreatePaddedMoneyString(money, false, false)
+  return Auctionator.Utilities.CreatePaddedMoneyString(money, true, true)
 end
 
 function QtItemsInBag()
@@ -963,7 +963,7 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
           buyout = math.floor(buyout/gold)*gold
 
           local location = ItemLocation:CreateFromBagAndSlot(bagId, slotId)
-          print(itemLink, dsprofit, overselling)
+          print(itemLink, MONEY(buyout), '(', dsprofit, ')', overselling)
           tryingPosting = itemLink
 
           C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
