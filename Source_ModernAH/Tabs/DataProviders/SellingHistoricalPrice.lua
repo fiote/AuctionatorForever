@@ -12,12 +12,21 @@ end
 
 function AuctionatorSellingHistoricalPriceProviderMixin:ReceiveEvent(eventName, itemInfo)
   if eventName == Auctionator.Selling.Events.BagItemClicked then
-    Auctionator.Utilities.DBKeyFromLink(itemInfo.itemLink, function(dbKeys)
+    local itemLink = itemInfo.itemLink
+    self.currentItemLink = itemLink
+    self.lastDBKey = nil
+
+    Auctionator.Utilities.DBKeyFromLink(itemLink, function(dbKeys)
+      if self.currentItemLink ~= itemLink then
+        return
+      end
+
       local dbKey = dbKeys[1]
       self:SetItem(dbKey)
     end)
 
   elseif eventName == Auctionator.Selling.Events.ClearBagItem then
+    self.currentItemLink = nil
     self.lastDBKey = nil
     self:Reset()
 

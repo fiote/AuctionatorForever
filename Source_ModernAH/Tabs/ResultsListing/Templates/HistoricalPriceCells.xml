@@ -1,0 +1,14 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Button
+    name="AuctionatorHistoricalPriceCellTemplate"
+    mixin="AuctionatorHistoricalPriceCellTemplateMixin"
+    inherits="AuctionatorPriceCellTemplate"
+    virtual="true"
+  />
+  <Button
+    name="AuctionatorHistoricalStringCellTemplate"
+    mixin="AuctionatorHistoricalStringCellTemplateMixin"
+    inherits="AuctionatorStringCellTemplate"
+    virtual="true"
+  />
+</Ui>

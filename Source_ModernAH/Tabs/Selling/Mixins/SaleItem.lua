@@ -998,22 +998,27 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 end
 
 function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
-  -- Do not apply discount if the cheapest price is from the current character
-  if self.cheapestCommodityResult and self.cheapestCommodityResult.containsOwnerItem and self.cheapestCommodityResult.owners[1] == "player" then
-    return
+  local currentPrice = self:GetHistoricalDiscountPrice()
+
+  if currentPrice == nil then
+    -- Do not apply discount if the cheapest price is from the current character
+    if self.cheapestCommodityResult and self.cheapestCommodityResult.containsOwnerItem and self.cheapestCommodityResult.owners[1] == "player" then
+      return
+    end
+
+    local itemKey = self.expectedItemKey
+
+    if C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
+      local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
+      local isOwner = result.containsOwnerItem and result.owners[1] == "player"
+      if isOwner then
+        return
+      end
+    end
+
+    currentPrice = self.Price:GetAmount()
   end
 
-	local itemKey = self.expectedItemKey
-
-	if C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
-  	local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
-		local isOwner = result.containsOwnerItem and result.owners[1] == "player"
-		if isOwner then
-			return
-		end
-	end
-
-  local currentPrice = self.Price:GetAmount()
   if currentPrice > 0 then
     -- Calculate the discounted price and round up
     local discountedPrice = math.ceil(currentPrice * multiplier)
@@ -1021,6 +1026,32 @@ function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
     discountedPrice = NormalizePrice(discountedPrice)
     self.Price:SetAmount(discountedPrice)
   end
+end
+
+function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
+  local parent = self:GetParent()
+  if self.itemInfo == nil or parent == nil or parent.PricesTabsContainer == nil or not parent.PricesTabsContainer:IsPriceHistoryView() then
+    return nil
+  end
+
+  local historicalPriceProvider = parent.HistoricalPriceProvider
+  if historicalPriceProvider == nil or historicalPriceProvider.currentItemLink ~= self.itemInfo.itemLink or historicalPriceProvider.lastDBKey == nil then
+    return nil
+  end
+
+  local historicalPrices = Auctionator.Database:GetPriceHistory(historicalPriceProvider.lastDBKey)
+  local lowestHistoricalPrice = nil
+
+  for _, historicalPrice in ipairs(historicalPrices) do
+    if historicalPrice.minSeen ~= nil and (
+      lowestHistoricalPrice == nil or
+      historicalPrice.minSeen < lowestHistoricalPrice
+    ) then
+      lowestHistoricalPrice = historicalPrice.minSeen
+    end
+  end
+
+  return lowestHistoricalPrice
 end
 
 function AuctionatorSaleItemMixin:Apply10PercentDiscount()

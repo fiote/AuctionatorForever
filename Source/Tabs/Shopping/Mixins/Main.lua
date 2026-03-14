@@ -19,6 +19,11 @@ function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   end
 
   self:StopSearch()
+  self.lastPreventedRowRetried = nil
+
+  if ResetAutoBuyFlowState then
+    ResetAutoBuyFlowState()
+  end
 
   self.searchRunning = true
   Auctionator.EventBus:Fire(self, Auctionator.Shopping.Tab.Events.SearchStart, terms)

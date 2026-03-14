@@ -3,14 +3,14 @@ local HISTORICAL_PRICE_PROVIDER_LAYOUT ={
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerText = AUCTIONATOR_L_UNIT_PRICE,
     headerParameters = { "minSeen" },
-    cellTemplate = "AuctionatorPriceCellTemplate",
+    cellTemplate = "AuctionatorHistoricalPriceCellTemplate",
     cellParameters = { "minSeen" }
   },
   {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerText = AUCTIONATOR_L_UPPER_UNIT_PRICE,
     headerParameters = { "maxSeen" },
-    cellTemplate = "AuctionatorPriceCellTemplate",
+    cellTemplate = "AuctionatorHistoricalPriceCellTemplate",
     cellParameters = { "maxSeen" },
     defaultHide = true
   },
@@ -18,7 +18,7 @@ local HISTORICAL_PRICE_PROVIDER_LAYOUT ={
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerText = AUCTIONATOR_L_RESULTS_AVAILABLE_COLUMN,
     headerParameters = { "available" },
-    cellTemplate = "AuctionatorStringCellTemplate",
+    cellTemplate = "AuctionatorHistoricalStringCellTemplate",
     cellParameters = { "availableFormatted" },
     width = 100
   },
@@ -26,7 +26,7 @@ local HISTORICAL_PRICE_PROVIDER_LAYOUT ={
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerText = AUCTIONATOR_L_DATE,
     headerParameters = { "rawDay" },
-    cellTemplate = "AuctionatorStringCellTemplate",
+    cellTemplate = "AuctionatorHistoricalStringCellTemplate",
     cellParameters = { "date" }
   },
 }
@@ -38,12 +38,20 @@ function AuctionatorHistoricalPriceProviderMixin:OnShow()
 end
 
 function AuctionatorHistoricalPriceProviderMixin:SetItem(dbKey)
+  self.lastDBKey = dbKey
   self:Reset()
 
   -- Reset columns
   self.onSearchStarted()
 
   local entries = Auctionator.Database:GetPriceHistory(dbKey)
+  local lowestMinSeen = nil
+
+  for _, entry in ipairs(entries) do
+    if entry.minSeen ~= nil and (lowestMinSeen == nil or entry.minSeen < lowestMinSeen) then
+      lowestMinSeen = entry.minSeen
+    end
+  end
 
   for _, entry in ipairs(entries) do
     if entry.available then
@@ -51,6 +59,8 @@ function AuctionatorHistoricalPriceProviderMixin:SetItem(dbKey)
     else
       entry.availableFormatted = ""
     end
+
+    entry.isLowestHistoricalPrice = lowestMinSeen ~= nil and entry.minSeen == lowestMinSeen
   end
 
   self:AppendEntries(entries, true)

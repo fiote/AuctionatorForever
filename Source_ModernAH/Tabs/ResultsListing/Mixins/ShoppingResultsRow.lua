@@ -59,6 +59,40 @@ end
 purchasing = nil
 toretry = nil
 
+local function ResetRowAutoBuyFlags(rowData)
+  if not rowData then
+    return
+  end
+
+  rowData.purchased = nil
+  rowData.preventedPurchase = nil
+  rowData.buying = nil
+  rowData.processing = nil
+  rowData.denied = nil
+end
+
+function ResetAutoBuyFlowState()
+  if purchasing then
+    C_AuctionHouse.CancelCommoditiesPurchase()
+    ResetRowAutoBuyFlags(purchasing.row and purchasing.row.rowData)
+    if purchasing.cell and purchasing.cell.text then
+      purchasing.cell.text:SetText((purchasing.row and purchasing.row.rowData and purchasing.row.rowData.available) or "")
+      purchasing.cell.text:SetTextColor(1, 1, 1, 1)
+    end
+  end
+
+  if toretry then
+    ResetRowAutoBuyFlags(toretry.row and toretry.row.rowData)
+    if toretry.cell and toretry.cell.text then
+      toretry.cell.text:SetText((toretry.row and toretry.row.rowData and toretry.row.rowData.available) or "")
+      toretry.cell.text:SetTextColor(1, 1, 1, 1)
+    end
+  end
+
+  purchasing = nil
+  toretry = nil
+end
+
 function PurchaseCommodity(row, itemID, quantity, price, cell)
   local itemName, itemLink = C_Item.GetItemInfo(itemID)
 

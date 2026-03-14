@@ -21,6 +21,8 @@ function AuctionatorSellingTabPricesContainerMixin:OnLoad()
 end
 
 function AuctionatorSellingTabPricesContainerMixin:SetView(viewIndex)
+  self.currentView = viewIndex
+
   PanelTemplates_SetTab(self, viewIndex)
 
   if not Auctionator.Config.Get(Auctionator.Config.Options.SELLING_SPLIT_PANELS) then
@@ -37,4 +39,8 @@ function AuctionatorSellingTabPricesContainerMixin:SetView(viewIndex)
   elseif viewIndex == YOUR_VIEW then
     self:GetParent().PostingHistoryListing:Show()
   end
+end
+
+function AuctionatorSellingTabPricesContainerMixin:IsPriceHistoryView()
+  return self.currentView == REALM_VIEW
 end
