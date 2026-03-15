@@ -16,7 +16,7 @@ local copperIcon = "|TInterface\\MoneyFrame\\UI-CopperIcon:12:12:0:0|t"
 local leftPadding = " "
 local rightPadding = " "
 
-function Auctionator.Utilities.CreatePaddedMoneyString(amount, hideSilver, hideCopper)
+function Auctionator.Utilities.CreatePaddedMoneyString(amount, hideSilver, hideCopper, useThousandsSeparator)
   if amount == nil then
     amount = 0
   end
@@ -24,6 +24,7 @@ function Auctionator.Utilities.CreatePaddedMoneyString(amount, hideSilver, hideC
   amount = math.floor(amount)
   hideSilver = hideSilver == true
   hideCopper = hideCopper == true
+  useThousandsSeparator = useThousandsSeparator == true
 
   local gold, silver, copper = getGold(amount), getSilver(amount), getCopper(amount)
   local showGold = gold ~= 0
@@ -43,7 +44,12 @@ function Auctionator.Utilities.CreatePaddedMoneyString(amount, hideSilver, hideC
   local parts = {}
 
   if showGold then
-    table.insert(parts, gold .. leftPadding .. goldIcon)
+    local goldString = tostring(gold)
+    if useThousandsSeparator then
+      goldString = BreakUpLargeNumbers(gold)
+    end
+
+    table.insert(parts, goldString .. leftPadding .. goldIcon)
   end
 
   if showSilver then

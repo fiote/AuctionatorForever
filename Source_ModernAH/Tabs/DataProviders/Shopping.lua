@@ -3,9 +3,9 @@ local SHOPPING_LIST_TABLE_LAYOUT = {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerParameters = { "minPrice" },
     headerText = AUCTIONATOR_L_RESULTS_PRICE_COLUMN,
-    cellTemplate = "AuctionatorPriceCellTemplate",
+    cellTemplate = "AuctionatorShoppingPriceCellTemplate",
     cellParameters = { "minPrice" },
-    width = 140
+    width = 92
   },
   {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",

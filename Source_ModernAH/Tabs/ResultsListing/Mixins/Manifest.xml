@@ -1,5 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
   <Script file="HistoricalPriceCells.lua"/>
+  <Script file="ShoppingPriceCell.lua" />
   <Script file="HistoricalPriceRow.lua"/>
   <Script file="SellingPostingHistoryRow.lua"/>
   <Script file="ShoppingResultsRow.lua" />
