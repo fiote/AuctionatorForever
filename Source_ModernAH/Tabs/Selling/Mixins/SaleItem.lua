@@ -892,7 +892,9 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 	local duration = WM.auctionatorDuration
   local quantity = 1
 
-  if AuctionatorShoppingFrame:RunAutoLogic() then return end
+  if AuctionatorShoppingFrame:RunInitialAutoLogicPrefetch() then
+    return
+  end
 
   if isCurrentlyPosting or waitingReadyEvent or tryingPosting then
     return
@@ -995,6 +997,8 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   end
 
   isCurrentlyPosting = false
+
+  AuctionatorShoppingFrame:RunAutoLogic()
 end
 
 function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)

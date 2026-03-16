@@ -63,6 +63,7 @@ function AuctionatorDirectSearchProviderMixin:CreateSearchTerm(term)
     },
     resultMetadata = {
       quantity = parsed.quantity,
+      searchTerm = term,
     }
   }
 end
@@ -128,6 +129,7 @@ function AuctionatorDirectSearchProviderMixin:ProcessSearchResults(addedResults)
       addedResults[index]
     )
     addedResults[index].purchaseQuantity = self.resultMetadata.quantity
+    addedResults[index].searchTerm = self.resultMetadata.searchTerm
     local filters = Auctionator.Search.Filters.Create(addedResults[index], self.currentFilter, filterTracker)
 
     filterTracker:SetWaiting(#filters)

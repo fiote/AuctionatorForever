@@ -134,8 +134,11 @@ function StartOneClickFlow(data)
   fprint('unitPrice', Auctionator.Utilities.CreatePaddedMoneyString(purchasing.unitPrice))
   fprint('totalPrice', Auctionator.Utilities.CreatePaddedMoneyString(purchasing.totalPrice))
 
-  purchasing.cell.text:SetText("starting")
-  purchasing.cell.text:SetTextColor(0.9, 0.9, 0.9, 1)
+  if purchasing.cell and purchasing.cell.text then
+    purchasing.cell.text:SetText("starting")
+    purchasing.cell.text:SetTextColor(0.9, 0.9, 0.9, 1)
+  end
+
   C_AuctionHouse.StartCommoditiesPurchase(purchasing.itemID, purchasing.quantity)
 end
 
@@ -144,6 +147,10 @@ function TryRetryPurchase()
     fprint('RETRYING PURCHASE')
     StartOneClickFlow(toretry)
   end
+end
+
+function IsShoppingPurchaseInProgress()
+  return purchasing ~= nil
 end
 -- ============================================================================
 -- ON COMMODITY PRICE UPDATED
@@ -176,8 +183,10 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
     fprint('diffTotal', Auctionator.Utilities.CreatePaddedMoneyString(diffTotal))
 
     fprint('CANCELLING PURCHASE')
-    purchasing.cell.text:SetText(dsDiff)
-    purchasing.cell.text:SetTextColor(1, 176/255, 0, 1)
+    if purchasing.cell and purchasing.cell.text then
+      purchasing.cell.text:SetText(dsDiff)
+      purchasing.cell.text:SetTextColor(1, 176/255, 0, 1)
+    end
 
     C_AuctionHouse.CancelCommoditiesPurchase()
 
@@ -215,7 +224,9 @@ local function OnCommodityPriceUnavailableEvent(self, event)
     return
   end
 
-  purchasing.cell.text:SetText("unavailable")
+  if purchasing.cell and purchasing.cell.text then
+    purchasing.cell.text:SetText("unavailable")
+  end
 
   -- Reset both flags to allow user to retry or try another row
   if purchasing.row and purchasing.row.rowData then
@@ -261,7 +272,9 @@ local function OnReadyToConfirmPurchaseEvent(self, event)
     return
   end
 
-  purchasing.cell.text:SetText("confirming")
+  if purchasing.cell and purchasing.cell.text then
+    purchasing.cell.text:SetText("confirming")
+  end
   C_AuctionHouse.ConfirmCommoditiesPurchase(purchasing.itemID, purchasing.quantity)
 end
 
@@ -281,8 +294,10 @@ local function OnPurchaseCompletedEvent(self, event)
     return
   end
 
-  purchasing.cell.text:SetText("purchased")
-  purchasing.cell.text:SetTextColor(139/255, 195/255, 74/255, 1)
+  if purchasing.cell and purchasing.cell.text then
+    purchasing.cell.text:SetText("purchased")
+    purchasing.cell.text:SetTextColor(139/255, 195/255, 74/255, 1)
+  end
 
   -- Keep purchased flag as true to prevent further purchases on this row
   -- (User should move to next row after successful purchase)
