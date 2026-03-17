@@ -790,7 +790,15 @@ end
 function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
   if eventName == "ITEM_SEARCH_RESULTS_UPDATED" then
     local itemKey = ...
-    self:BuildAutoBuyItemQueue(itemKey)
+    if self.pendingAutoBuyItemPurchase ~= nil and ItemKeysMatch(self.pendingAutoBuyItemPurchase.itemKey, itemKey) then
+      -- Let the buy-item data provider consume the search update before
+      -- reading its rows to choose the next auction to bid on.
+      C_Timer.After(0, function()
+        if self.pendingAutoBuyItemPurchase ~= nil and ItemKeysMatch(self.pendingAutoBuyItemPurchase.itemKey, itemKey) then
+          self:PlaceNextAutoBuyItemBid()
+        end
+      end)
+    end
 
   elseif eventName == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" then
     if self.pendingAutoBuyItemPurchase ~= nil then
