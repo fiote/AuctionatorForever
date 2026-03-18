@@ -124,7 +124,9 @@ function AuctionatorBuyItemDataProviderMixin:OnEvent(eventName, itemRef)
     self:AppendEntries(self:ProcessItemResults(itemRef), true)
   elseif eventName == "AUCTION_HOUSE_NEW_BID_RECEIVED" and self.expectedItemKey ~= nil then
     local auctionInfo = C_AuctionHouse.GetAuctionInfoByID(itemRef)
-    if Auctionator.Utilities.ItemKeyString(self.expectedItemKey) == Auctionator.Utilities.ItemKeyString(auctionInfo.itemKey) then
+    if auctionInfo ~= nil and
+       auctionInfo.itemKey ~= nil and
+       Auctionator.Utilities.ItemKeyString(self.expectedItemKey) == Auctionator.Utilities.ItemKeyString(auctionInfo.itemKey) then
       self:GetParent():Search()
     end
   end

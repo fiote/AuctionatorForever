@@ -6,7 +6,9 @@ local EVENTBUS_EVENTS = {
   Auctionator.Shopping.Tab.Events.ShowHistoricalPrices,
   Auctionator.Shopping.Tab.Events.UpdateSearchTerm,
   Auctionator.Shopping.Tab.Events.BuyScreenShown,
-  Auctionator.Shopping.Tab.Events.SearchEnd
+  Auctionator.Shopping.Tab.Events.SearchEnd,
+  Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseSucceeded,
+  Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseFailed,
 }
 
 local AUTO_BUY_LIST_NAME = "[__] X to Buy"
@@ -79,7 +81,10 @@ function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   end
 
   self.searchRunning = true
-  Auctionator.EventBus:Fire(self, Auctionator.Shopping.Tab.Events.SearchStart, terms)
+  Auctionator.EventBus
+    :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
+    :Fire(self, Auctionator.Shopping.Tab.Events.SearchStart, terms)
+    :UnregisterSource(self)
   self.SearchProvider:Search(terms, options or {})
   self:StartSpinner()
 end
@@ -105,6 +110,20 @@ end
 function AuctionatorShoppingTabFrameMixin:InvalidateAutoBuyResults()
   self.autoBuyResultsReady = false
   self.autoBuyLoadedTerms = nil
+end
+
+function AuctionatorShoppingTabFrameMixin:CommitAutoBuyPurchase(index, searchTerm, purchasedQuantity)
+  local remainingQuantity = math.max(0, self:GetRemainingAutoBuyQuantity(index, searchTerm) - (purchasedQuantity or 0))
+  self:SetRemainingAutoBuyQuantity(index, searchTerm, remainingQuantity)
+  self:InvalidateAutoBuyResults()
+  return remainingQuantity
+end
+
+function AuctionatorShoppingTabFrameMixin:CompleteAutoBuyEntry(index)
+  local shoppingList = self:GetAutoBuyList()
+  if shoppingList ~= nil and shoppingList:GetItemCount() > 0 then
+    self:AdvanceAutoBuyIndex(shoppingList, index)
+  end
 end
 
 function AuctionatorShoppingTabFrameMixin:SyncAutoBuyRemainingQuantities(list)
@@ -158,6 +177,8 @@ end
 
 function AuctionatorShoppingTabFrameMixin:IsAutoBuyBusy()
   return self.pendingAutoBuySearch ~= nil or
+    self.pendingAutoBuyItemPurchase ~= nil or
+    self.pendingAutoBuyCommodityPurchase ~= nil or
     (IsShoppingPurchaseInProgress ~= nil and IsShoppingPurchaseInProgress())
 end
 
@@ -263,6 +284,7 @@ function AuctionatorShoppingTabFrameMixin:OnLoad()
   self.autoBuyRemainingQuantities = {}
   self.pendingAutoBuySearch = nil
   self.pendingAutoBuyItemPurchase = nil
+  self.pendingAutoBuyCommodityPurchase = nil
 
   self.dialogs = {}
 
@@ -313,6 +335,7 @@ function AuctionatorShoppingTabFrameMixin:OnLoad()
 
   self.shouldDefaultOpenOnShow = true
   self:RegisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
+  self:RegisterEvent("AUCTION_HOUSE_NEW_BID_RECEIVED")
   self:RegisterEvent("AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED")
   if Auctionator.Constants.IsVanilla then
     self:RegisterEvent("AUCTION_HOUSE_CLOSED")
@@ -337,7 +360,10 @@ function AuctionatorShoppingTabFrameMixin:SetupSearchProvider()
         self.pendingAutoBuySearch = nil
         self:PrimeAutoBuyItemPurchase()
       end
-      Auctionator.EventBus:Fire(self, Auctionator.Shopping.Tab.Events.SearchEnd, results)
+      Auctionator.EventBus
+        :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
+        :Fire(self, Auctionator.Shopping.Tab.Events.SearchEnd, results)
+        :UnregisterSource(self)
       self.ListsContainer.SpinnerAnim:Stop()
       self.ListsContainer.LoadingSpinner:Hide()
       self.ListsContainer.ResultsText:Hide()
@@ -345,7 +371,10 @@ function AuctionatorShoppingTabFrameMixin:SetupSearchProvider()
       PlaySoundFile(567286)
     end,
     function(current, total, partialResults)
-      Auctionator.EventBus:Fire(self, Auctionator.Shopping.Tab.Events.SearchIncrementalUpdate, partialResults, total, current)
+      Auctionator.EventBus
+        :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
+        :Fire(self, Auctionator.Shopping.Tab.Events.SearchIncrementalUpdate, partialResults, total, current)
+        :UnregisterSource(self)
       self.ListsContainer.ResultsText:SetText(Auctionator.Locales.Apply("LIST_SEARCH_STATUS", current, total, self:GetAppropriateListSearchName()))
     end
   )
@@ -557,13 +586,12 @@ function AuctionatorShoppingTabFrameMixin:TryBuyAutoBuySearchTerm(index, searchT
       "each."
     )
     if PurchaseCommodity(nil, itemKeyInfo.itemID, purchaseQuantity, rowData.minPrice, nil) then
-      local remainingQuantity = quantity - purchaseQuantity
-      self:SetRemainingAutoBuyQuantity(index, searchTerm, remainingQuantity)
-      self:InvalidateAutoBuyResults()
-      if remainingQuantity <= 0 then
-        return "advance"
-      end
-
+      self.pendingAutoBuyCommodityPurchase = {
+        itemID = itemKeyInfo.itemID,
+        listIndex = index,
+        searchTerm = searchTerm,
+        quantity = purchaseQuantity,
+      }
       return "hold"
     end
 
@@ -592,6 +620,10 @@ function AuctionatorShoppingTabFrameMixin:StartAutoBuyItemPurchase(rowData, inde
     listIndex = index,
     maxPrice = GetSearchTermMaxPrice(searchTerm),
     seenAuctionIDs = {},
+    waitingForPurchaseResult = false,
+    waitingForResultRefresh = false,
+    pendingAuctionID = nil,
+    pendingAuctionQuantity = nil,
   }
 
   local itemKeyInfo = C_AuctionHouse.GetItemKeyInfo(rowData.itemKey)
@@ -642,6 +674,11 @@ function AuctionatorShoppingTabFrameMixin:PlaceNextAutoBuyItemBid()
     return false
   end
 
+  if purchaseState.waitingForPurchaseResult or purchaseState.waitingForResultRefresh then
+    AutoBuyPrint("Waiting for the last item purchase to finish refreshing.")
+    return "hold"
+  end
+
   local nextAuction, status = self:GetNextAutoBuyItemAuction(purchaseState)
   if status == "waiting" then
     AutoBuyPrint("Waiting for exact item results before bidding.")
@@ -655,18 +692,12 @@ function AuctionatorShoppingTabFrameMixin:PlaceNextAutoBuyItemBid()
   end
 
   AutoBuyPrint("Placing bid at", AutoBuyFormatPrice(nextAuction.price) .. ".")
+  purchaseState.pendingAuctionID = nextAuction.auctionID
+  purchaseState.pendingAuctionQuantity = nextAuction.quantity or 1
+  purchaseState.waitingForPurchaseResult = true
   C_AuctionHouse.PlaceBid(nextAuction.auctionID, nextAuction.price)
-  purchaseState.seenAuctionIDs[nextAuction.auctionID] = true
-  purchaseState.remainingQuantity = math.max(0, (purchaseState.remainingQuantity or purchaseState.quantity) - (nextAuction.quantity or 1))
-  if purchaseState.searchTerm ~= nil and purchaseState.listIndex ~= nil then
-    self:SetRemainingAutoBuyQuantity(purchaseState.listIndex, purchaseState.searchTerm, purchaseState.remainingQuantity)
-  end
 
-  AutoBuyPrint("Bid sent.", tostring(purchaseState.remainingQuantity), "remaining for this entry.")
-  if purchaseState.remainingQuantity <= 0 then
-    self.pendingAutoBuyItemPurchase = nil
-    return "advance"
-  end
+  AutoBuyPrint("Bid sent, waiting for auction house confirmation.")
 
   return "hold"
 end
@@ -756,7 +787,8 @@ function AuctionatorShoppingTabFrameMixin:GetAppropriateListSearchName()
   end
 end
 
-function AuctionatorShoppingTabFrameMixin:ReceiveEvent(eventName, eventData)
+function AuctionatorShoppingTabFrameMixin:ReceiveEvent(eventName, ...)
+  local eventData = ...
   if eventName == Auctionator.Shopping.Events.ListImportFinished then
     self.ListsContainer:ExpandList(Auctionator.Shopping.ListManager:GetByName(eventData))
 
@@ -784,6 +816,25 @@ function AuctionatorShoppingTabFrameMixin:ReceiveEvent(eventName, eventData)
       self.autoBuyLoadedTerms = self.pendingAutoBuySearch.terms
       self.pendingAutoBuySearch = nil
     end
+
+  elseif eventName == Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseSucceeded then
+    local itemID, quantity = ...
+    local purchaseState = self.pendingAutoBuyCommodityPurchase
+    if purchaseState ~= nil and purchaseState.itemID == itemID then
+      local remainingQuantity = self:CommitAutoBuyPurchase(purchaseState.listIndex, purchaseState.searchTerm, quantity)
+      if remainingQuantity <= 0 then
+        self:CompleteAutoBuyEntry(purchaseState.listIndex)
+      end
+      self.pendingAutoBuyCommodityPurchase = nil
+    end
+
+  elseif eventName == Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseFailed then
+    local itemID = ...
+    local purchaseState = self.pendingAutoBuyCommodityPurchase
+    if purchaseState ~= nil and purchaseState.itemID == itemID then
+      self:InvalidateAutoBuyResults()
+      self.pendingAutoBuyCommodityPurchase = nil
+    end
   end
 end
 
@@ -795,9 +846,45 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
       -- reading its rows to choose the next auction to bid on.
       C_Timer.After(0, function()
         if self.pendingAutoBuyItemPurchase ~= nil and ItemKeysMatch(self.pendingAutoBuyItemPurchase.itemKey, itemKey) then
-          self:PlaceNextAutoBuyItemBid()
+          if self.pendingAutoBuyItemPurchase.waitingForResultRefresh then
+            self.pendingAutoBuyItemPurchase.waitingForResultRefresh = false
+            if self.pendingAutoBuyItemPurchase.remainingQuantity <= 0 then
+              self:CompleteAutoBuyEntry(self.pendingAutoBuyItemPurchase.listIndex)
+              self.pendingAutoBuyItemPurchase = nil
+              return
+            end
+          end
+          local listIndex = self.pendingAutoBuyItemPurchase.listIndex
+          local actionResult = self:PlaceNextAutoBuyItemBid()
+          if actionResult == "advance" and self.pendingAutoBuyItemPurchase == nil then
+            self:CompleteAutoBuyEntry(listIndex)
+          end
         end
       end)
+    end
+
+  elseif eventName == "AUCTION_HOUSE_NEW_BID_RECEIVED" then
+    local auctionID = ...
+    if self.pendingAutoBuyItemPurchase ~= nil and
+       self.pendingAutoBuyItemPurchase.waitingForPurchaseResult and
+       self.pendingAutoBuyItemPurchase.pendingAuctionID == auctionID then
+      local purchaseState = self.pendingAutoBuyItemPurchase
+      purchaseState.waitingForPurchaseResult = false
+      purchaseState.waitingForResultRefresh = true
+      purchaseState.seenAuctionIDs[auctionID] = true
+      purchaseState.pendingAuctionID = nil
+      purchaseState.remainingQuantity = self:CommitAutoBuyPurchase(
+        purchaseState.listIndex,
+        purchaseState.searchTerm,
+        purchaseState.pendingAuctionQuantity
+      )
+      purchaseState.pendingAuctionQuantity = nil
+
+      AutoBuyPrint(
+        "Auction house accepted the bid.",
+        tostring(purchaseState.remainingQuantity),
+        "remaining for this entry."
+      )
     end
 
   elseif eventName == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" then
@@ -805,6 +892,7 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
       self.pendingAutoBuyItemPurchase = nil
       self:InvalidateAutoBuyResults()
     end
+    self.pendingAutoBuyCommodityPurchase = nil
 
   elseif eventName == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
     local showType = ...
@@ -815,6 +903,7 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
       self.autoBuyRemainingQuantities = {}
       self.pendingAutoBuySearch = nil
       self.pendingAutoBuyItemPurchase = nil
+      self.pendingAutoBuyCommodityPurchase = nil
     end
   elseif eventName == "AUCTION_HOUSE_CLOSED" then
     self.shouldDefaultOpenOnShow = true
@@ -823,6 +912,7 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
     self.autoBuyRemainingQuantities = {}
     self.pendingAutoBuySearch = nil
     self.pendingAutoBuyItemPurchase = nil
+    self.pendingAutoBuyCommodityPurchase = nil
   end
 end
 

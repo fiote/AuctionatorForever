@@ -142,6 +142,37 @@ function StartOneClickFlow(data)
   C_AuctionHouse.StartCommoditiesPurchase(purchasing.itemID, purchasing.quantity)
 end
 
+local function BroadcastCommodityAutoBuyResult(eventName, itemID, quantity)
+  Auctionator.EventBus
+    :RegisterSource(BroadcastCommodityAutoBuyResult, "ShoppingResultsRowAutoBuy")
+    :Fire(BroadcastCommodityAutoBuyResult, eventName, itemID, quantity)
+    :UnregisterSource(BroadcastCommodityAutoBuyResult)
+end
+
+local function FailCommodityPurchase(statusText)
+  if not purchasing then
+    return
+  end
+
+  if purchasing.cell and purchasing.cell.text and statusText ~= nil then
+    purchasing.cell.text:SetText(statusText)
+    purchasing.cell.text:SetTextColor(1, 1, 1, 1)
+  end
+
+  if purchasing.row and purchasing.row.rowData then
+    purchasing.row.rowData.purchased = false
+    purchasing.row.rowData.preventedPurchase = false
+  end
+
+  BroadcastCommodityAutoBuyResult(
+    Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseFailed,
+    purchasing.itemID,
+    purchasing.quantity
+  )
+
+  purchasing = nil
+end
+
 function TryRetryPurchase()
   if toretry and not purchasing then
     fprint('RETRYING PURCHASE')
@@ -198,6 +229,12 @@ local function OnCommodityPriceUpdatedEvent(self, event, newUnitPrice, newTotalP
       purchasing.row.rowData.preventedPurchase = true
     end
 
+    BroadcastCommodityAutoBuyResult(
+      Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseFailed,
+      purchasing.itemID,
+      purchasing.quantity
+    )
+
     toretry = purchasing
     purchasing = nil
 
@@ -228,13 +265,7 @@ local function OnCommodityPriceUnavailableEvent(self, event)
     purchasing.cell.text:SetText("unavailable")
   end
 
-  -- Reset both flags to allow user to retry or try another row
-  if purchasing.row and purchasing.row.rowData then
-    purchasing.row.rowData.purchased = false
-    purchasing.row.rowData.preventedPurchase = false
-  end
-
-  purchasing = nil
+  FailCommodityPurchase("unavailable")
 
   fprint('=====================================')
 end
@@ -254,11 +285,32 @@ local function OnPurchaseDroppedEvent(self, event)
   if not purchasing then
     return
   end
+
+  FailCommodityPurchase("dropped")
 end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED")
 f:SetScript("OnEvent", OnPurchaseDroppedEvent)
+
+-- ============================================================================
+-- ON COMMODITY PURCHASE FAILED
+-- ============================================================================
+
+local function OnCommodityPurchaseFailedEvent(self, event)
+  fprint('---------------')
+  fprint('OnCommodityPurchaseFailedEvent', event)
+
+  if not purchasing then
+    return
+  end
+
+  FailCommodityPurchase("failed")
+end
+
+local f = CreateFrame("Frame")
+f:RegisterEvent("COMMODITY_PURCHASE_FAILED")
+f:SetScript("OnEvent", OnCommodityPurchaseFailedEvent)
 
 -- ============================================================================
 -- ON READY TO CONFIRM PURCHASE
@@ -306,6 +358,12 @@ local function OnPurchaseCompletedEvent(self, event)
     purchasing.row.rowData.purchased = true
     purchasing.row.rowData.preventedPurchase = false
   end
+
+  BroadcastCommodityAutoBuyResult(
+    Auctionator.Shopping.Tab.Events.AutoBuyCommodityPurchaseSucceeded,
+    purchasing.itemID,
+    purchasing.quantity
+  )
 
   purchasing = nil
 

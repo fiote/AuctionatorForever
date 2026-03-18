@@ -22,4 +22,6 @@ Auctionator.Shopping.Tab.Events = {
   UpdateSearchTerm = "shopping update search term",
   ListSearchRequested = "shopping list search requested",
   BuyScreenShown = "shopping list buy screen shown",
+  AutoBuyCommodityPurchaseSucceeded = "shopping auto buy commodity purchase succeeded",
+  AutoBuyCommodityPurchaseFailed = "shopping auto buy commodity purchase failed",
 }
