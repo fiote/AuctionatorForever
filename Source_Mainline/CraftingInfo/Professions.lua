@@ -219,9 +219,67 @@ local function ProfitString(profit)
 
 end
 
+local function WrapTextInColor(text, color)
+  return string.format("|cff%s%s|r", color, text)
+end
+
+local function MutedLabelText(text)
+  return WrapTextInColor(text, "c6a15a")
+end
+
+local function MutedDividerText(text)
+  return WrapTextInColor(text, "b8924e")
+end
+
+local function ProfitPerItemPriceString(profit, quantity)
+  local perItemProfit = math.floor(math.abs(profit) / quantity)
+
+  if profit >= 0 then
+    return WHITE_FONT_COLOR:WrapTextInColorCode(GetMoneyString(perItemProfit, true))
+  end
+
+  return RED_FONT_COLOR:WrapTextInColorCode("-" .. GetMoneyString(perItemProfit, true))
+end
+
+local function ProfitPerItemStrings(schematicForm, profit)
+  local recipeInfo = schematicForm:GetRecipeInfo()
+  local recipeID = recipeInfo.recipeID
+  local recipeLevel = schematicForm:GetCurrentRecipeLevel()
+  local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false, recipeLevel)
+  local result = {
+    regular = {},
+    lumber = {},
+  }
+
+  for _, reagentSlotSchematic in ipairs(recipeSchematic.reagentSlotSchematics) do
+    if reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Basic and
+       reagentSlotSchematic.quantityRequired > 0 and
+       #reagentSlotSchematic.reagents > 0 then
+      local itemID = reagentSlotSchematic.reagents[1].itemID
+      local itemName = itemID and C_Item.GetItemInfo(itemID)
+
+      if itemName ~= nil then
+        local line =
+          MutedLabelText(itemName .. ": ") ..
+          ProfitPerItemPriceString(profit, reagentSlotSchematic.quantityRequired) ..
+          MutedLabelText(AUCTIONATOR_L_PER_ITEM)
+
+        if string.match(itemName, "Lumber$") then
+          table.insert(result.lumber, line)
+        else
+          table.insert(result.regular, line)
+        end
+      end
+    end
+  end
+
+  return result
+end
+
 function Auctionator.CraftingInfo.GetInfoText(schematicForm, showProfit)
   local result = ""
   local lines = 0
+  local reagentProfitLines = nil
   if Auctionator.Config.Get(Auctionator.Config.Options.CRAFTING_INFO_SHOW_COST) then
     if lines > 0 then
       result = result .. "\n"
@@ -239,6 +297,8 @@ function Auctionator.CraftingInfo.GetInfoText(schematicForm, showProfit)
       end
       result = result .. ProfitString(profit) .. Auctionator.CraftingInfo.GetProfitWarning(profit, age, anyPrice, exact)
       lines = lines + 1
+
+      reagentProfitLines = ProfitPerItemStrings(schematicForm, profit)
     end
   end
 
@@ -248,6 +308,31 @@ function Auctionator.CraftingInfo.GetInfoText(schematicForm, showProfit)
     end
     result = result .. CheapestQualityCostString(schematicForm)
     lines = lines + 1
+  end
+
+  if reagentProfitLines ~= nil and (#reagentProfitLines.regular > 0 or #reagentProfitLines.lumber > 0) then
+    if lines > 0 then
+      result = result .. "\n"
+    end
+    result = result .. MutedDividerText("----------------")
+    lines = lines + 1
+
+    for _, reagentProfitLine in ipairs(reagentProfitLines.regular) do
+      result = result .. "\n" .. reagentProfitLine
+      lines = lines + 1
+    end
+
+    if #reagentProfitLines.lumber > 0 then
+      if #reagentProfitLines.regular > 0 then
+        result = result .. "\n" .. MutedDividerText("----------------")
+        lines = lines + 1
+      end
+
+      for _, reagentProfitLine in ipairs(reagentProfitLines.lumber) do
+        result = result .. "\n" .. reagentProfitLine
+        lines = lines + 1
+      end
+    end
   end
 
   return result, lines

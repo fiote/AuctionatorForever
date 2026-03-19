@@ -911,11 +911,23 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
         local itemName, itemLink, itemRarity, itemLevel = GetItemInfo(itemLink)
         local craftData = CraftInfoAnywhere.API.GetData(itemID, itemLevel)
         local buyout = 0
+        local warbandMoneyBuyout = nil
 
         local dsprofit = ''
         local overselling = ''
 
-        if craftData then
+        if WarbandMoney and WarbandMoney.GetCalculatedSellerPrice and itemID ~= WM.swordID then
+          warbandMoneyBuyout = WarbandMoney.GetCalculatedSellerPrice(itemID)
+        end
+
+        if warbandMoneyBuyout and warbandMoneyBuyout > 0 then
+          buyout = warbandMoneyBuyout
+          if craftData and craftData.craftCost then
+            dsprofit = MONEY(buyout - craftData.craftCost)
+          else
+            dsprofit = MONEY(buyout)
+          end
+        elseif craftData then
 
           buyout = craftData.auctionPrice
           if craftData.profit < WM.minProfitPerItem*0.98 then

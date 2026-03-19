@@ -452,6 +452,7 @@ AUCTIONATOR_LOCALES.enUS = function()
   L["TO_CRAFT_COLON"] = "To Craft:"
   L["CHEAPEST_QUALITY_COST_COLON"] = "Cheapest Quality Cost:"
   L["PROFIT_COLON"] = "Profit:"
+  L["PER_ITEM"] = "/item"
   L["REAGENTS_VALUE_COLON"] = "Reagents Value:"
   L["PROFIT_WARNING_AGE"] = "(price data at least 10 days old)"
   L["PROFIT_WARNING_MISSING"] = "(no price data)"
