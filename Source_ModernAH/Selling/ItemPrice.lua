@@ -13,8 +13,9 @@ local function getSetAmount()
 end
 
 
-function Auctionator.Selling.CalculateItemPriceFromPrice(basePrice)
+function Auctionator.Selling.CalculateItemPriceFromPrice(basePrice, itemLink)
   Auctionator.Debug.Message(" AuctionatorItemSellingMixin:CalculateItemPriceFromResult")
+  basePrice = Auctionator.Selling.ApplyCraftSimQualityPriceLimit(basePrice, itemLink)
   local value
 
   if userPrefersPercentage() then

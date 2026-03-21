@@ -324,9 +324,12 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
          self.itemInfo ~= nil then
     local selectedPrices, shouldUndercut = ...
     local buyoutAmount = selectedPrices.buyout or selectedPrices.bid
+    local itemLink = self.itemInfo and self.itemInfo.itemLink
 
     if shouldUndercut then
-      buyoutAmount = Auctionator.Selling.CalculateItemPriceFromPrice(buyoutAmount)
+      buyoutAmount = Auctionator.Selling.CalculateItemPriceFromPrice(buyoutAmount, itemLink)
+    else
+      buyoutAmount = Auctionator.Selling.ApplyCraftSimQualityPriceLimit(buyoutAmount, itemLink)
     end
 
     if Auctionator.Config.Get(Auctionator.Config.Options.SHOW_SELLING_BID_PRICE) then
@@ -428,7 +431,10 @@ function AuctionatorSaleItemMixin:UpdateForNewItem()
     local price = Auctionator.Database:GetFirstPrice(dbKeys)
 
     if price ~= nil then
-      self:UpdateSalesPrice(price)
+      self:UpdateSalesPrice(Auctionator.Selling.ApplyCraftSimQualityPriceLimit(
+        price,
+        self.itemInfo and self.itemInfo.itemLink
+      ))
     elseif IsEquipment(self.itemInfo) then
       self:SetEquipmentMultiplier(self.itemInfo.itemLink)
     else
@@ -616,7 +622,10 @@ function AuctionatorSaleItemMixin:ProcessCommodityResults(itemID, ...)
     postingPrice = result.unitPrice
   else
     -- Otherwise, we're not the lowest price, so calculate based on user preferences
-    postingPrice = Auctionator.Selling.CalculateItemPriceFromPrice(result.unitPrice)
+    postingPrice = Auctionator.Selling.CalculateItemPriceFromPrice(
+      result.unitPrice,
+      self.itemInfo and self.itemInfo.itemLink
+    )
   end
 
   -- Didn't find anything currently posted, and nothing in DB
@@ -649,14 +658,20 @@ function AuctionatorSaleItemMixin:ProcessCommodityResults(itemID, ...)
     for index = 1, qtresults do
       local resultInfo = C_AuctionHouse.GetCommoditySearchResultInfo(itemID, index)
       if resultInfo.unitPrice >= minGoodPrice then
-        self:UpdateSalesPrice(resultInfo.unitPrice)
+        self:UpdateSalesPrice(Auctionator.Selling.ApplyCraftSimQualityPriceLimit(
+          resultInfo.unitPrice,
+          self.itemInfo and self.itemInfo.itemLink
+        ))
         -- and then we return to ignore the default 'match price' logic
         return
       end
     end
   end
 
-  self:UpdateSalesPrice(postingPrice)
+  self:UpdateSalesPrice(Auctionator.Selling.ApplyCraftSimQualityPriceLimit(
+    postingPrice,
+    self.itemInfo and self.itemInfo.itemLink
+  ))
 end
 
 function AuctionatorSaleItemMixin:GetItemResult(itemKey)
@@ -704,7 +719,10 @@ function AuctionatorSaleItemMixin:ProcessItemResults(itemKey)
     -- use this price
     postingPrice = result.buyoutAmount
   else
-    postingPrice = Auctionator.Selling.CalculateItemPriceFromPrice(result.buyoutAmount or result.bidAmount)
+    postingPrice = Auctionator.Selling.CalculateItemPriceFromPrice(
+      result.buyoutAmount or result.bidAmount,
+      self.itemInfo and self.itemInfo.itemLink
+    )
   end
 
   -- Didn't find anything currently posted, and nothing in DB
@@ -713,7 +731,10 @@ function AuctionatorSaleItemMixin:ProcessItemResults(itemKey)
     return
   end
 
-  self:UpdateSalesPrice(postingPrice)
+  self:UpdateSalesPrice(Auctionator.Selling.ApplyCraftSimQualityPriceLimit(
+    postingPrice,
+    self.itemInfo and self.itemInfo.itemLink
+  ))
 end
 
 function AuctionatorSaleItemMixin:GetPostButtonState()
