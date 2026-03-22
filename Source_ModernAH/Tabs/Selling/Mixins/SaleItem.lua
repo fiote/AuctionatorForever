@@ -826,6 +826,8 @@ function AuctionatorSaleItemMixin:GetDuration()
 end
 
 local tryingPosting = nil
+local tryingPostingItemID = nil
+local tryingPostingPlannedPrice = nil
 local waitingReadyEvent = false
 local isCurrentlyPosting = false
 
@@ -837,6 +839,11 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
     end
 
     if eventName == 'AUCTION_HOUSE_AUCTION_CREATED' then
+      if WarbandMoney and WarbandMoney.ConsumePlannedPostingPrice and tryingPostingItemID and tryingPostingPlannedPrice then
+        WarbandMoney.ConsumePlannedPostingPrice(tryingPostingItemID, tryingPostingPlannedPrice)
+      end
+      tryingPostingItemID = nil
+      tryingPostingPlannedPrice = nil
       tryingPosting = nil
       waitingReadyEvent = true
       return
@@ -844,6 +851,8 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED' then
       print('[Dropped]', tryingPosting)
+      tryingPostingItemID = nil
+      tryingPostingPlannedPrice = nil
       tryingPosting = nil
       isCurrentlyPosting = false
       return
@@ -851,6 +860,8 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_POST_ERROR' then
       print('[Error]', tryingPosting)
+      tryingPostingItemID = nil
+      tryingPostingPlannedPrice = nil
       tryingPosting = nil
       isCurrentlyPosting = false
       return
@@ -858,6 +869,8 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_POST_WARNING' then
       print('[Warn]', tryingPosting)
+      tryingPostingItemID = nil
+      tryingPostingPlannedPrice = nil
       tryingPosting = nil
       isCurrentlyPosting = false
       return
@@ -912,6 +925,8 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   local WM = WarbandMoney.addon
 	local duration = WM.auctionatorDuration
   local quantity = 1
+  local unknownAuctionFallbackPrice = WM.unknownAuctionFallbackPrice or (10000 * WM.g)
+  local warbandMoneyPlanActive = WarbandMoney and WarbandMoney.HasPostingPlan and WarbandMoney.HasPostingPlan()
 
   if AuctionatorShoppingFrame:RunInitialAutoLogicPrefetch() then
     return
@@ -933,12 +948,14 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
         local craftData = CraftInfoAnywhere.API.GetData(itemID, itemLevel)
         local buyout = 0
         local warbandMoneyBuyout = nil
+        local plannedPostingPrice = nil
 
         local dsprofit = ''
         local overselling = ''
 
-        if WarbandMoney and WarbandMoney.GetCalculatedSellerPrice and itemID ~= WM.swordID then
-          warbandMoneyBuyout = WarbandMoney.GetCalculatedSellerPrice(itemID)
+        if WarbandMoney and WarbandMoney.PeekPlannedPostingPrice and itemID ~= WM.swordID then
+          plannedPostingPrice = WarbandMoney.PeekPlannedPostingPrice(itemID)
+          warbandMoneyBuyout = plannedPostingPrice
         end
 
         if warbandMoneyBuyout and warbandMoneyBuyout > 0 then
@@ -948,16 +965,31 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
           else
             dsprofit = MONEY(buyout)
           end
-        elseif craftData then
+        elseif not warbandMoneyPlanActive and craftData then
+          local craftAuctionPrice = craftData.auctionPrice or 0
+          local craftProfit = craftData.profit or 0
 
-          buyout = craftData.auctionPrice
-          if craftData.profit < WM.minProfitPerItem*0.98 then
+          if craftAuctionPrice <= 0 then
+            craftAuctionPrice = unknownAuctionFallbackPrice
+            if craftData.craftCost then
+              craftProfit = craftAuctionPrice - craftData.craftCost
+            elseif craftProfit <= 0 then
+              craftProfit = craftAuctionPrice
+            end
+          end
+
+          buyout = craftAuctionPrice
+          if craftProfit < WM.minProfitPerItem*0.98 then
             buyout = WM.oversellPrice
-            craftData.profit = WM.oversellPrice - craftData.craftCost
+            if craftData.craftCost then
+              craftProfit = WM.oversellPrice - craftData.craftCost
+            else
+              craftProfit = WM.oversellPrice
+            end
             overselling = '[OVERSELLING]'
           end
 
-          dsprofit = MONEY(craftData.profit)
+          dsprofit = MONEY(craftProfit)
         end
 
         local gold = WM.g
@@ -1011,19 +1043,29 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
           buyout = math.floor(buyout/gold)*gold
 
           local location = ItemLocation:CreateFromBagAndSlot(bagId, slotId)
-          print(itemLink, MONEY(buyout), '(', dsprofit, ')', overselling)
           tryingPosting = itemLink
+          tryingPostingItemID = itemID
+          tryingPostingPlannedPrice = plannedPostingPrice
 
-          C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
-
-          C_Timer.After(5, function()
-            if tryingPosting == itemLink then
-              print('[AH Dropped]')
-              tryingPosting = nil
-              isCurrentlyPosting = false
-            end
-          end)
-          return
+          local postStarted = C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
+          if postStarted then
+            print(itemLink, MONEY(buyout), '(', dsprofit, ')', overselling)
+            C_Timer.After(5, function()
+              if tryingPosting == itemLink then
+                print('[AH Dropped]')
+                tryingPostingItemID = nil
+                tryingPostingPlannedPrice = nil
+                tryingPosting = nil
+                isCurrentlyPosting = false
+              end
+            end)
+            return
+          else
+            tryingPosting = nil
+            tryingPostingItemID = nil
+            tryingPostingPlannedPrice = nil
+            isCurrentlyPosting = true
+          end
         end
       end
     end
