@@ -826,8 +826,11 @@ function AuctionatorSaleItemMixin:GetDuration()
 end
 
 local tryingPosting = nil
+local tryingPostingBuyout = nil
 local tryingPostingItemID = nil
 local tryingPostingPlannedPrice = nil
+local pendingPosting = nil
+local pendingPostingBuyout = nil
 local pendingPostingItemID = nil
 local pendingPostingPlannedPrice = nil
 local waitingReadyEvent = false
@@ -841,8 +844,14 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
     end
 
     if eventName == 'AUCTION_HOUSE_AUCTION_CREATED' then
+      pendingPosting = tryingPosting
+      pendingPostingBuyout = tryingPostingBuyout
       pendingPostingItemID = tryingPostingItemID
       pendingPostingPlannedPrice = tryingPostingPlannedPrice
+      if pendingPosting and pendingPostingBuyout then
+        print('[Posted]', pendingPosting, Auctionator.Utilities.CreatePaddedMoneyString(pendingPostingBuyout, true, true))
+      end
+      tryingPostingBuyout = nil
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
       tryingPosting = nil
@@ -852,6 +861,7 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED' then
       print('[Dropped]', tryingPosting)
+      tryingPostingBuyout = nil
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
       tryingPosting = nil
@@ -861,6 +871,7 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_POST_ERROR' then
       print('[Error]', tryingPosting)
+      tryingPostingBuyout = nil
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
       tryingPosting = nil
@@ -870,6 +881,7 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
 
     if eventName == 'AUCTION_HOUSE_POST_WARNING' then
       print('[Warn]', tryingPosting)
+      tryingPostingBuyout = nil
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
       tryingPosting = nil
@@ -922,7 +934,6 @@ function QtItemsInBag()
 end
 
 function AuctionatorSaleItemMixin:RunAutoLogic()
-
   local WM = WarbandMoney.addon
 	local duration = WM.auctionatorDuration
   local quantity = 1
@@ -931,6 +942,8 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 
   if WarbandMoney and WarbandMoney.ConsumePlannedPostingPrice and pendingPostingItemID and pendingPostingPlannedPrice then
     WarbandMoney.ConsumePlannedPostingPrice(pendingPostingItemID, pendingPostingPlannedPrice)
+    pendingPosting = nil
+    pendingPostingBuyout = nil
     pendingPostingItemID = nil
     pendingPostingPlannedPrice = nil
   end
@@ -1047,28 +1060,23 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 
           local location = ItemLocation:CreateFromBagAndSlot(bagId, slotId)
           tryingPosting = itemLink
+          tryingPostingBuyout = buyout
           tryingPostingItemID = itemID
           tryingPostingPlannedPrice = plannedPostingPrice
 
           local postStarted = C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
-          if postStarted then
-            print(itemLink, MONEY(buyout), '(', dsprofit, ')', overselling)
-            C_Timer.After(5, function()
-              if tryingPosting == itemLink then
-                print('[AH Dropped]')
-                tryingPostingItemID = nil
-                tryingPostingPlannedPrice = nil
-                tryingPosting = nil
-                isCurrentlyPosting = false
-              end
-            end)
-            return
-          else
-            tryingPosting = nil
-            tryingPostingItemID = nil
-            tryingPostingPlannedPrice = nil
-            isCurrentlyPosting = true
-          end
+          C_Timer.After(5, function()
+            if tryingPosting == itemLink then
+              print('[AH Dropped]')
+              tryingPostingBuyout = nil
+              tryingPostingItemID = nil
+              tryingPostingPlannedPrice = nil
+              tryingPosting = nil
+              isCurrentlyPosting = false
+            end
+          end)
+
+          return
         end
       end
     end
