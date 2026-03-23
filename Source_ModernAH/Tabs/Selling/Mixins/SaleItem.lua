@@ -935,10 +935,6 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
     pendingPostingPlannedPrice = nil
   end
 
-  if AuctionatorShoppingFrame:RunInitialAutoLogicPrefetch() then
-    return
-  end
-
   if isCurrentlyPosting or waitingReadyEvent or tryingPosting then
     return
   end
@@ -1079,6 +1075,10 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   end
 
   isCurrentlyPosting = false
+
+  if AuctionatorShoppingFrame:RunInitialAutoLogicPrefetch() then
+    return
+  end
 
   AuctionatorShoppingFrame:RunAutoLogic()
 end
