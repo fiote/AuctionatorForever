@@ -828,6 +828,8 @@ end
 local tryingPosting = nil
 local tryingPostingItemID = nil
 local tryingPostingPlannedPrice = nil
+local pendingPostingItemID = nil
+local pendingPostingPlannedPrice = nil
 local waitingReadyEvent = false
 local isCurrentlyPosting = false
 
@@ -839,9 +841,8 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
     end
 
     if eventName == 'AUCTION_HOUSE_AUCTION_CREATED' then
-      if WarbandMoney and WarbandMoney.ConsumePlannedPostingPrice and tryingPostingItemID and tryingPostingPlannedPrice then
-        WarbandMoney.ConsumePlannedPostingPrice(tryingPostingItemID, tryingPostingPlannedPrice)
-      end
+      pendingPostingItemID = tryingPostingItemID
+      pendingPostingPlannedPrice = tryingPostingPlannedPrice
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
       tryingPosting = nil
@@ -927,6 +928,12 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   local quantity = 1
   local unknownAuctionFallbackPrice = WM.unknownAuctionFallbackPrice or (10000 * WM.g)
   local warbandMoneyPlanActive = WarbandMoney and WarbandMoney.HasPostingPlan and WarbandMoney.HasPostingPlan()
+
+  if WarbandMoney and WarbandMoney.ConsumePlannedPostingPrice and pendingPostingItemID and pendingPostingPlannedPrice then
+    WarbandMoney.ConsumePlannedPostingPrice(pendingPostingItemID, pendingPostingPlannedPrice)
+    pendingPostingItemID = nil
+    pendingPostingPlannedPrice = nil
+  end
 
   if AuctionatorShoppingFrame:RunInitialAutoLogicPrefetch() then
     return
