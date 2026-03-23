@@ -1,7 +1,25 @@
 Auctionator.PostingHistoryMixin = {}
 
+local RETENTION_SECONDS = 30 * 24 * 60 * 60
+
+local function GetCutoffTime()
+  return time() - RETENTION_SECONDS
+end
+
+local function PruneEntriesByAge(itemInfo, cutoffTime)
+  local index = 1
+  while index <= #itemInfo do
+    if type(itemInfo[index]) ~= "table" or type(itemInfo[index].time) ~= "number" or itemInfo[index].time < cutoffTime then
+      table.remove(itemInfo, index)
+    else
+      index = index + 1
+    end
+  end
+end
+
 function Auctionator.PostingHistoryMixin:Init(db)
   self.db = db
+  self:PruneExpiredEntries()
   Auctionator.EventBus:Register(self, {
     Auctionator.Selling.Events.AuctionCreated
   })
@@ -30,8 +48,33 @@ local function IsSameDay(time1, time2)
   return time1.day == time2.day and time1.month == time2.month and time1.year == time2.year
 end
 
+function Auctionator.PostingHistoryMixin:PruneExpiredEntries()
+  local cutoffTime = GetCutoffTime()
+
+  for key, itemInfo in pairs(self.db) do
+    if key ~= "__dbversion" then
+      if type(itemInfo) == "table" then
+        PruneEntriesByAge(itemInfo, cutoffTime)
+        if #itemInfo == 0 then
+          self.db[key] = nil
+        end
+      else
+        self.db[key] = nil
+      end
+    end
+  end
+end
+
 function Auctionator.PostingHistoryMixin:PruneKey(key)
   local itemInfo = self.db[key]
+  local cutoffTime = GetCutoffTime()
+
+  PruneEntriesByAge(itemInfo, cutoffTime)
+
+  if #itemInfo == 0 then
+    self.db[key] = nil
+    return
+  end
 
   local currentTime = date("*t", itemInfo[#itemInfo].time)
   local price = itemInfo[#itemInfo].price
