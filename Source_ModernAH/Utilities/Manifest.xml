@@ -2,6 +2,7 @@
   <Script file="ItemInfoFromLocation.lua"/>
   <Script file="DBKeyFromBrowseResult.lua"/>
   <Script file="GetPetLevelFromLink.lua"/>
+  <Script file="GetItemQualityTier.lua"/>
   <Script file="ItemKeyString.lua"/>
   <Script file="IsEquipment.lua"/>
 </Ui>
