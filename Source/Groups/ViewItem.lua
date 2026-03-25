@@ -43,39 +43,28 @@ local function GetProfessionLinkQualityTier(itemLink)
   return tonumber(qualityTier)
 end
 
-local function GetProfessionItemLevelQualityTier(itemLevel)
-  if not itemLevel then
-    return nil
-  end
-
-  if itemLevel >= 206 then
-    return 5
-  elseif itemLevel >= 199 then
-    return 4
-  elseif itemLevel >= 192 then
-    return 3
-  elseif itemLevel >= 186 then
-    return 2
-  elseif itemLevel >= 183 then
-    return 2
-  elseif itemLevel >= 180 then
-    return 1
-  end
-
-  return nil
-end
-
 local function GetReagentQualityTier(itemID, itemLink)
-  if not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+  if not C_TradeSkillUI then
     return nil
   end
 
   local quality
-  if itemID then
-    quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
+  if C_TradeSkillUI.GetItemCraftedQualityByItemInfo then
+    if itemLink then
+      quality = C_TradeSkillUI.GetItemCraftedQualityByItemInfo(itemLink)
+    end
+    if not quality and itemID then
+      quality = C_TradeSkillUI.GetItemCraftedQualityByItemInfo(itemID)
+    end
   end
-  if not quality and itemLink then
-    quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemLink)
+
+  if not quality and C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+    if itemLink then
+      quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemLink)
+    end
+    if not quality and itemID then
+      quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
+    end
   end
 
   return quality
@@ -95,7 +84,6 @@ local function GetDisplayQualityTier(itemInfo)
   if isProfessionEntry or isProfessionEquipment then
     qualityTier = GetTrackQualityTier(itemInfo.itemLink)
       or GetProfessionLinkQualityTier(itemInfo.itemLink)
-      or GetProfessionItemLevelQualityTier(itemInfo.itemLevel)
       or GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)
   elseif not isEquipment then
     qualityTier = GetReagentQualityTier(itemInfo.itemID, itemInfo.itemLink)

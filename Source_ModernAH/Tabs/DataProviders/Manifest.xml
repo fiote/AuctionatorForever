@@ -1,4 +1,5 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Script file="ProfessionQualityTemplates.lua" />
   <Script file="ItemKeyLoading.lua" />
   <Script file="Shopping.lua" />
   <Script file="Cancelling.lua" />

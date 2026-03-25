@@ -48,34 +48,52 @@ local function GetProfessionLinkQualityTier(itemLink)
   return tonumber(qualityTier)
 end
 
-local function GetProfessionItemLevelQualityTier(itemLevel)
-  if not itemLevel then
+local function GetItemLinkFromItemKey(itemKey)
+  if not itemKey or not C_TooltipInfo or not C_TooltipInfo.GetItemKey then
     return nil
   end
 
-  if itemLevel >= 206 then
-    return 5
-  elseif itemLevel >= 199 then
-    return 4
-  elseif itemLevel >= 192 then
-    return 3
-  elseif itemLevel >= 186 then
-    return 2
-  elseif itemLevel >= 183 then
-    return 2
-  elseif itemLevel >= 180 then
-    return 1
+  local info = C_TooltipInfo.GetItemKey(
+    itemKey.itemID,
+    itemKey.itemLevel or 0,
+    itemKey.itemSuffix or 0
+  )
+  if info and info.hyperlink and C_Item.GetItemInfoInstant(info.hyperlink) == itemKey.itemID then
+    return info.hyperlink
   end
 
   return nil
 end
 
-local function GetLegacyCraftingQualityMarkup(itemID)
-  if not itemID or not C_TradeSkillUI or not C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+local function GetCraftingQualityTier(itemID, itemLink)
+  if not C_TradeSkillUI then
     return nil
   end
 
-  local quality = C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
+  local quality
+  if C_TradeSkillUI.GetItemCraftedQualityByItemInfo then
+    quality = (itemLink and C_TradeSkillUI.GetItemCraftedQualityByItemInfo(itemLink))
+      or (itemID and C_TradeSkillUI.GetItemCraftedQualityByItemInfo(itemID))
+  end
+
+  if not quality and C_TradeSkillUI.GetItemReagentQualityByItemInfo then
+    quality = (itemLink and C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemLink))
+      or (itemID and C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID))
+  end
+
+  return quality
+end
+
+local function GetProfessionTemplateQualityTier(itemID, itemLevel)
+  if not Auctionator.ProfessionQualityTemplates then
+    return nil
+  end
+
+  return Auctionator.ProfessionQualityTemplates.GetTier(itemID, itemLevel)
+end
+
+local function GetLegacyCraftingQualityMarkup(itemID)
+  local quality = GetCraftingQualityTier(itemID)
   if quality then
     return Auctionator.Utilities.GetCraftingQualityMarkup(quality)
   end
@@ -100,12 +118,8 @@ function AuctionatorItemKeyLoadingMixin:GetGearQualityTier(rowEntry)
   local qualityTier = GetTrackQualityTier(rowEntry.itemLink)
   if not qualityTier and IsProfessionEquipmentItem(itemID, rowEntry.itemLink) then
     qualityTier = GetProfessionLinkQualityTier(rowEntry.itemLink)
-      or GetProfessionItemLevelQualityTier(rowEntry.itemKey and rowEntry.itemKey.itemLevel)
-      or (
-        C_TradeSkillUI and
-        C_TradeSkillUI.GetItemReagentQualityByItemInfo and
-        C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
-      )
+      or GetProfessionTemplateQualityTier(itemID, rowEntry.itemKey and rowEntry.itemKey.itemLevel)
+      or GetCraftingQualityTier(itemID, rowEntry.itemLink)
   end
 
   if qualityTier and qualityTier >= 1 and qualityTier <= 5 then
@@ -145,6 +159,10 @@ function AuctionatorItemKeyLoadingMixin:ProcessItemKey(rowEntry, itemKeyInfo)
   local itemID = rowEntry.itemKey and rowEntry.itemKey.itemID
   local isEquipment = itemID and IsEquipmentItem(itemID)
   rowEntry.gearQualityTier = nil
+
+  if rowEntry.itemLink == nil then
+    rowEntry.itemLink = GetItemLinkFromItemKey(rowEntry.itemKey)
+  end
 
   if isEquipment then
     text = itemKeyInfo.itemName or text
