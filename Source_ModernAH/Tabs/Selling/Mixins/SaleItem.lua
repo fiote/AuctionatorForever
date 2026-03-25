@@ -848,9 +848,6 @@ function OnCurrentlyPurchasingEvent(self, eventName, ...)
       pendingPostingBuyout = tryingPostingBuyout
       pendingPostingItemID = tryingPostingItemID
       pendingPostingPlannedPrice = tryingPostingPlannedPrice
-      if pendingPosting and pendingPostingBuyout then
-        print('[Posted]', pendingPosting, Auctionator.Utilities.CreatePaddedMoneyString(pendingPostingBuyout, true, true))
-      end
       tryingPostingBuyout = nil
       tryingPostingItemID = nil
       tryingPostingPlannedPrice = nil
@@ -1064,7 +1061,8 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
           tryingPostingItemID = itemID
           tryingPostingPlannedPrice = plannedPostingPrice
 
-          local postStarted = C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
+          print('[Posting]', itemLink, Auctionator.Utilities.CreatePaddedMoneyString(buyout, true, true))
+          C_AuctionHouse.PostItem(location, duration, quantity, nil, buyout)
           C_Timer.After(5, function()
             if tryingPosting == itemLink then
               print('[AH Dropped]')
