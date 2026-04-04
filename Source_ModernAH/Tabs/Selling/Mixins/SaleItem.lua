@@ -978,7 +978,7 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
           else
             dsprofit = MONEY(buyout)
           end
-        elseif not warbandMoneyPlanActive and craftData then
+        elseif not warbandMoneyPlanActive and craftData and type(WM.minProfitPerItem) == "number" then
           local craftAuctionPrice = craftData.auctionPrice or 0
           local craftProfit = craftData.profit or 0
 
