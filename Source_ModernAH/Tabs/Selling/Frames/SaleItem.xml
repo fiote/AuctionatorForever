@@ -111,6 +111,15 @@
           <OnClick>self:GetParent():Apply10PercentDiscount()</OnClick>
         </Scripts>
       </Button>
+      <Button parentKey="DiscountZButton" name="AuctionatorDiscountZButton" inherits="UIPanelButtonTemplate" text="Z%Off">
+        <Size x="60" y="22"/>
+        <Anchors>
+          <Anchor point="TOPRIGHT" relativeKey="$parent.Discount10Button" relativePoint="TOPLEFT" x="-5"/>
+        </Anchors>
+        <Scripts>
+          <OnClick>self:GetParent():ApplyExpiredSinceLastSaleDiscount()</OnClick>
+        </Scripts>
+      </Button>
       <Button parentKey="Discount5Button" name="AuctionatorDiscount5Button" inherits="UIPanelButtonTemplate" text="5%Off">
         <Size x="60" y="22"/>
         <Anchors>

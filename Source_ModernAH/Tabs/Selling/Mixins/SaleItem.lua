@@ -1161,6 +1161,21 @@ function AuctionatorSaleItemMixin:Apply1PercentDiscount()
   self:PostItem()
 end
 
+function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
+  local expiredCount = 0
+  if self.itemInfo ~= nil and
+     self.itemInfo.itemLink ~= nil and
+     Auctionator.Selling ~= nil and
+     Auctionator.Selling.TSMAccounting ~= nil and
+     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) == "function" then
+    expiredCount = Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(self.itemInfo.itemLink) or 0
+  end
+
+  local discountPercent = math.min(math.max(expiredCount, 0), 20)
+  self:ApplyPercentDiscount(1 - (discountPercent / 100))
+  self:PostItem()
+end
+
 function AuctionatorSaleItemMixin:PostItem(confirmed)
   if not self:GetPostButtonState() then
     Auctionator.Debug.Message("Trying to post when we can't. Returning")
