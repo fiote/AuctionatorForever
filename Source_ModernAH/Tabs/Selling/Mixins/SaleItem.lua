@@ -90,6 +90,18 @@ local function IsValidItem(item)
     C_Item.DoesItemExist(item.location)
 end
 
+local function GetExpiredSinceLastSale(itemInfo)
+  if itemInfo == nil or
+     itemInfo.itemLink == nil or
+     Auctionator.Selling == nil or
+     Auctionator.Selling.TSMAccounting == nil or
+     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) ~= "function" then
+    return 0
+  end
+
+  return Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(itemInfo.itemLink) or 0
+end
+
 AuctionatorSaleItemMixin = {}
 
 function AuctionatorSaleItemMixin:OnLoad()
@@ -170,10 +182,10 @@ end
 
 function AuctionatorSaleItemMixin:UpdateSkipButton()
   if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) then
-    self.PostButton:SetSize(114, 22)
+    self.PostButton:SetSize(75, 22)
     self.SkipButton:Show()
   else
-    self.PostButton:SetSize(194, 22)
+    self.PostButton:SetSize(150, 22)
     self.SkipButton:Hide()
   end
 end
@@ -210,7 +222,7 @@ function AuctionatorSaleItemMixin:OnUpdate()
   end
 
   self.TotalPrice:SetText(
-    GetMoneyString(self.Quantity:GetNumber() * self.Price:GetAmount(), true)
+    Auctionator.Utilities.CreatePaddedMoneyString(self.Quantity:GetNumber() * self.Price:GetAmount(), true, true, true)
   )
 
   if self.Quantity:GetNumber() > self:GetPostLimit() then
@@ -219,7 +231,16 @@ function AuctionatorSaleItemMixin:OnUpdate()
 
   self.MaxButton:SetEnabled(self.Quantity:GetNumber() ~= self:GetPostLimit())
 
-  self.DepositPrice:SetText(GetMoneyString(self:GetDeposit(), true))
+  local deposit = self:GetDeposit()
+  local unitDeposit = self:GetDeposit(1)
+  local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
+  local depositText = GetMoneyString(deposit, true)
+
+  if expiredCount > 0 then
+    depositText = depositText .. " (" .. GetMoneyString(unitDeposit * expiredCount, true) .. ")"
+  end
+
+  self.DepositPrice:SetText(depositText)
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
 end
@@ -234,9 +255,10 @@ function AuctionatorSaleItemMixin:SetMax()
   self.Quantity:SetNumber(self:GetPostLimit())
 end
 
-function AuctionatorSaleItemMixin:GetDeposit()
+function AuctionatorSaleItemMixin:GetDeposit(quantity)
   local deposit = 0
   local duration = self:GetDuration()
+  quantity = quantity or self.Quantity:GetNumber()
 
   if duration == nil then
     local selectedDuration = self.Duration:GetValue() or Auctionator.Config.Get(Auctionator.Config.Options.AUCTION_DURATION)
@@ -254,14 +276,14 @@ function AuctionatorSaleItemMixin:GetDeposit()
     deposit = C_AuctionHouse.CalculateCommodityDeposit(
       self.itemInfo.itemID,
       duration,
-      self.Quantity:GetNumber()
+      quantity
     ) or deposit
 
   else
     deposit = C_AuctionHouse.CalculateItemDeposit(
       self.itemInfo.location,
       duration,
-      self.Quantity:GetNumber()
+      quantity
     ) or deposit
   end
 
@@ -451,7 +473,7 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
   self:UpdateSalesPrice(0)
 
   self.DepositPrice:SetText(GetMoneyString(100, true))
-  self.TotalPrice:SetText(GetMoneyString(100, true))
+  self.TotalPrice:SetText(Auctionator.Utilities.CreatePaddedMoneyString(100, true, true, true))
 end
 
 local DURATIONS_TO_TIME = {
@@ -1146,31 +1168,8 @@ function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
   return lowestHistoricalPrice
 end
 
-function AuctionatorSaleItemMixin:Apply10PercentDiscount()
-  self:ApplyPercentDiscount(0.9)
-  self:PostItem()
-end
-
-function AuctionatorSaleItemMixin:Apply5PercentDiscount()
-  self:ApplyPercentDiscount(0.95)
-  self:PostItem()
-end
-
-function AuctionatorSaleItemMixin:Apply1PercentDiscount()
-  self:ApplyPercentDiscount(0.99)
-  self:PostItem()
-end
-
 function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
-  local expiredCount = 0
-  if self.itemInfo ~= nil and
-     self.itemInfo.itemLink ~= nil and
-     Auctionator.Selling ~= nil and
-     Auctionator.Selling.TSMAccounting ~= nil and
-     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) == "function" then
-    expiredCount = Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(self.itemInfo.itemLink) or 0
-  end
-
+  local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
   local discountPercent = math.min(math.max(expiredCount, 0), 20)
   self:ApplyPercentDiscount(1 - (discountPercent / 100))
   self:PostItem()

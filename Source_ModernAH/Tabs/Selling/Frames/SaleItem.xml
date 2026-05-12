@@ -88,12 +88,12 @@
 
       <Frame inherits="AuctionatorDurationHorizontalRadioControls" parentKey="Duration">
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.MaxButton" relativePoint="TOPRIGHT" x="20" y="10"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.MaxButton" relativePoint="TOPRIGHT" x="-10" y="10"/>
         </Anchors>
       </Frame>
 
       <Button parentKey="PostButton" name="AuctionatorPostButton" inherits="UIPanelButtonTemplate" text="AUCTIONATOR_L_POST">
-        <Size x="194" y="22"/>
+        <Size x="160" y="22"/>
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="BOTTOMLEFT" x="20" />
         </Anchors>
@@ -102,46 +102,19 @@
         </Scripts>
       </Button>
 
-      <Button parentKey="Discount10Button" name="AuctionatorDiscount10Button" inherits="UIPanelButtonTemplate" text="10%Off">
-        <Size x="60" y="22"/>
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="BOTTOMLEFT" x="20" y="70"/>
-        </Anchors>
-        <Scripts>
-          <OnClick>self:GetParent():Apply10PercentDiscount()</OnClick>
-        </Scripts>
-      </Button>
       <Button parentKey="DiscountZButton" name="AuctionatorDiscountZButton" inherits="UIPanelButtonTemplate" text="Z%Off">
         <Size x="60" y="22"/>
         <Anchors>
-          <Anchor point="TOPRIGHT" relativeKey="$parent.Discount10Button" relativePoint="TOPLEFT" x="-5"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="TOPLEFT" x="10" y="27"/>
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():ApplyExpiredSinceLastSaleDiscount()</OnClick>
         </Scripts>
       </Button>
-      <Button parentKey="Discount5Button" name="AuctionatorDiscount5Button" inherits="UIPanelButtonTemplate" text="5%Off">
-        <Size x="60" y="22"/>
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.Discount10Button" relativePoint="TOPRIGHT" x="5"/>
-        </Anchors>
-        <Scripts>
-          <OnClick>self:GetParent():Apply5PercentDiscount()</OnClick>
-        </Scripts>
-      </Button>
-      <Button parentKey="Discount1Button" name="AuctionatorDiscount1Button" inherits="UIPanelButtonTemplate" text="1%Off">
-        <Size x="60" y="22"/>
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.Discount5Button" relativePoint="TOPRIGHT" x="5"/>
-        </Anchors>
-        <Scripts>
-          <OnClick>self:GetParent():Apply1PercentDiscount()</OnClick>
-        </Scripts>
-      </Button>
       <Button parentKey="AutoLogicButton" name="AuctionatorAutoLogicButton" inherits="UIPanelButtonTemplate" text="Auto">
         <Size x="60" y="22"/>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.Discount1Button" relativePoint="TOPRIGHT" x="5"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.DiscountZButton" relativePoint="TOPRIGHT" x="5"/>
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():RunAutoLogic()</OnClick>
@@ -149,7 +122,7 @@
       </Button>
 
       <Button parentKey="SkipButton" name="AuctionatorSkipPostingButton" inherits="UIPanelButtonTemplate" text="AUCTIONATOR_L_SKIP" hidden="true">
-        <Size x="80" y="22"/>
+        <Size x="85" y="22"/>
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.PostButton" relativePoint="TOPRIGHT"/>
         </Anchors>
@@ -172,7 +145,7 @@
       <Layer level="BACKGROUND">
         <FontString inherits="GameFontNormal" parentKey="Deposit" Text="AUCTIONATOR_L_DEPOSIT">
           <Anchors>
-            <Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.Duration" x="-10" />
+            <Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.SkipButton" x="15" y="50" />
           </Anchors>
         </FontString>
       </Layer>
