@@ -140,6 +140,7 @@ function AuctionatorSaleItemMixin:OnShow()
   self.lastItemInfo = nil
   self.nextItem = nil
   self.prevItem = nil
+  self.priceCheckPassed = true
 
   self:UpdateSkipButton()
   self:Reset()
@@ -257,6 +258,12 @@ end
 
 function AuctionatorSaleItemMixin:GetDeposit(quantity)
   local deposit = 0
+
+  -- Protect against nil itemInfo
+  if not self.itemInfo then
+    return deposit
+  end
+
   local duration = self:GetDuration()
   quantity = quantity or self.Quantity:GetNumber()
 
@@ -400,7 +407,7 @@ function AuctionatorSaleItemMixin:Update()
 
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
-
+  self:ValidateMinimumPrice()
 end
 
 function AuctionatorSaleItemMixin:UpdateVisuals()
@@ -759,6 +766,28 @@ function AuctionatorSaleItemMixin:ProcessItemResults(itemKey)
   ))
 end
 
+function AuctionatorSaleItemMixin:ValidateMinimumPrice()
+  if not self.itemInfo then
+    self.priceCheckPassed = true
+    return
+  end
+
+  -- Calculate total price (quantity * price per item)
+  local totalPrice = self.Quantity:GetNumber() * self.Price:GetAmount()
+
+  -- Get deposit for this item
+  local deposit = self:GetDeposit()
+  local unitDeposit = self:GetDeposit(1)
+  local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
+  local totalDeposit = deposit + (unitDeposit * expiredCount)
+
+  -- Minimum price is 10x the total deposit (current + expired)
+  local minRequiredPrice = totalDeposit * 10
+
+  -- Store result in cache (validate once)
+  self.priceCheckPassed = totalPrice >= minRequiredPrice
+end
+
 function AuctionatorSaleItemMixin:GetPostButtonState()
   return
     self.itemInfo ~= nil and
@@ -791,6 +820,9 @@ function AuctionatorSaleItemMixin:GetPostButtonState()
         self.BidPrice:GetAmount() > 0
       )
     ) and
+
+    -- Total price must be at least 10 times the total deposit amount
+    self.priceCheckPassed and
 
     -- Not throttled (to avoid silent post failure)
     Auctionator.AH.IsNotThrottled()

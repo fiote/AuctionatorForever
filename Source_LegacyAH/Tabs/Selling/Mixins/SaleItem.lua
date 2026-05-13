@@ -80,6 +80,8 @@ function AuctionatorSaleItemMixin:OnShow()
   self:UpdateSkipButton()
   self:Reset()
 
+  self.priceCheckPassed = true
+
   if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_SHOULD_RESELECT_ITEM) then
     local key = Auctionator.Config.Get(Auctionator.Config.Options.SELLING_RESELECT_ITEM)
     if key ~= nil then
@@ -230,13 +232,16 @@ function AuctionatorSaleItemMixin:GetNumStacks()
   return math.min(self.Stacks.NumStacks:GetNumber(), self.itemInfo.count)
 end
 
-function AuctionatorSaleItemMixin:GetDeposit()
+function AuctionatorSaleItemMixin:GetDeposit(quantity)
+  if self.itemInfo == nil then
+    return 0
+  end
   return GetAuctionDeposit(
     self:GetDuration(),
     math.min(self:GetBidAmount(), MAXIMUM_BID_PRICE),
     math.min(self.StackPrice:GetAmount(), MAXIMUM_BID_PRICE),
-    self:GetStackSize(),
-    self:GetNumStacks()
+    quantity or self:GetStackSize(),
+    quantity and 1 or self:GetNumStacks()
   )
 end
 
@@ -398,6 +403,7 @@ function AuctionatorSaleItemMixin:Update()
     self:UpdateForNoItem()
   end
 
+  self:ValidateMinimumPrice()
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
 end
@@ -412,6 +418,23 @@ function AuctionatorSaleItemMixin:UpdateVisuals()
     -- No item, reset all the visuals
     self.TitleArea.Text:SetText("")
   end
+end
+
+function AuctionatorSaleItemMixin:ValidateMinimumPrice()
+  self.priceCheckPassed = true
+
+  if self.itemInfo == nil then
+    return
+  end
+
+  local totalPrice = self:GetUnitPrice() * self:GetNumStacks() * self:GetStackSize()
+  local deposit = self:GetDeposit()
+  local unitDeposit = self:GetDeposit(1)
+  local itemInfo = self.itemInfo
+  local expiredCount = Auctionator.GetExpiredSinceLastSale(itemInfo) or 0
+  local minRequiredPrice = (deposit + unitDeposit * expiredCount) * 10
+
+  self.priceCheckPassed = (totalPrice >= minRequiredPrice)
 end
 
 -- The exact item name is only loaded when needed as it slows down loading the
@@ -609,6 +632,9 @@ function AuctionatorSaleItemMixin:GetPostButtonState()
       self.UnitPrice:GetAmount() > 0 or
       self.BidPrice:GetAmount() > 0
     ) and
+
+    -- Minimum price check (validated once on item selection)
+    self.priceCheckPassed and
 
     -- Have opted to ignore the throttle or searches on the client aren't throttled
     (not Auctionator.Config.Get(Auctionator.Config.Options.SELLING_GREY_POST_BUTTON) or Auctionator.AH.IsNotThrottled())
