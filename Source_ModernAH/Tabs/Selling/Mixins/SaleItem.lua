@@ -182,12 +182,49 @@ function AuctionatorSaleItemMixin:OnHide()
 end
 
 function AuctionatorSaleItemMixin:UpdateSkipButton()
-  if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) then
+  self:UpdatePostAndSkipButtonLayout()
+end
+
+function AuctionatorSaleItemMixin:ShouldSwapPostAndSkipButtons()
+  return Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) and
+    self.priceCheckPassed == false
+end
+
+function AuctionatorSaleItemMixin:UpdatePostAndSkipButtonLayout()
+  local autoSelectNext = Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT)
+  local swapButtons = self:ShouldSwapPostAndSkipButtons()
+
+  if self.postAndSkipButtonLayoutAutoSelectNext == autoSelectNext and
+     self.postAndSkipButtonsSwapped == swapButtons then
+    return
+  end
+
+  self.postAndSkipButtonLayoutAutoSelectNext = autoSelectNext
+  self.postAndSkipButtonsSwapped = swapButtons
+
+  if autoSelectNext then
     self.PostButton:SetSize(75, 22)
     self.SkipButton:Show()
   else
     self.PostButton:SetSize(150, 22)
     self.SkipButton:Hide()
+  end
+
+  self.PostButton:ClearAllPoints()
+  self.SkipButton:ClearAllPoints()
+  self.PrevButton:ClearAllPoints()
+  self.Deposit:ClearAllPoints()
+
+  if swapButtons then
+    self.SkipButton:SetPoint("TOPLEFT", self.Duration, "BOTTOMLEFT", 20, 0)
+    self.PostButton:SetPoint("TOPLEFT", self.SkipButton, "TOPRIGHT", 0, 0)
+    self.PrevButton:SetPoint("TOPRIGHT", self.SkipButton, "TOPLEFT", 0, 0)
+    self.Deposit:SetPoint("TOPLEFT", self.PostButton, "TOPRIGHT", 15, 50)
+  else
+    self.PostButton:SetPoint("TOPLEFT", self.Duration, "BOTTOMLEFT", 20, 0)
+    self.SkipButton:SetPoint("TOPLEFT", self.PostButton, "TOPRIGHT", 0, 0)
+    self.PrevButton:SetPoint("TOPRIGHT", self.PostButton, "TOPLEFT", 0, 0)
+    self.Deposit:SetPoint("TOPLEFT", self.SkipButton, "TOPRIGHT", 15, 50)
   end
 end
 
@@ -242,6 +279,7 @@ function AuctionatorSaleItemMixin:OnUpdate()
   end
 
   self.DepositPrice:SetText(depositText)
+  self:ValidateMinimumPrice()
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
 end
@@ -405,9 +443,9 @@ function AuctionatorSaleItemMixin:Update()
     self:UpdateForNoItem()
   end
 
+  self:ValidateMinimumPrice()
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
-  self:ValidateMinimumPrice()
 end
 
 function AuctionatorSaleItemMixin:UpdateVisuals()
@@ -828,9 +866,6 @@ function AuctionatorSaleItemMixin:GetPostButtonState()
       )
     ) and
 
-    -- Total price must be at least 10 times the total deposit amount
-    self.priceCheckPassed and
-
     -- Not throttled (to avoid silent post failure)
     Auctionator.AH.IsNotThrottled()
 end
@@ -864,6 +899,8 @@ function AuctionatorSaleItemMixin:RequiresConfirmationState()
 end
 
 function AuctionatorSaleItemMixin:UpdatePostButtonState()
+  self:UpdatePostAndSkipButtonLayout()
+
   if self:GetPostButtonState() then
     self.PostButton:Enable()
   else
