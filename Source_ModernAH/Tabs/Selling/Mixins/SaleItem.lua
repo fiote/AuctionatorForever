@@ -772,6 +772,13 @@ function AuctionatorSaleItemMixin:ValidateMinimumPrice()
     return
   end
 
+  local itemInfo = { C_Item.GetItemInfo(self.itemInfo.itemLink) }
+  local vendorPrice = itemInfo[Auctionator.Constants.ITEM_INFO.SELL_PRICE]
+  if vendorPrice == nil or vendorPrice == 0 then
+    self.priceCheckPassed = true
+    return
+  end
+
   -- Calculate total price (quantity * price per item)
   local totalPrice = self.Quantity:GetNumber() * self.Price:GetAmount()
 
