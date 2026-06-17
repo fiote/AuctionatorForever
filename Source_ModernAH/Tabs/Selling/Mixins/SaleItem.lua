@@ -1245,6 +1245,10 @@ function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
 end
 
 function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
+  if self:ShouldSwapPostAndSkipButtons() then
+    self:SkipItem()
+    return
+  end
   local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
   local discountPercent = math.min(math.max(expiredCount, 0), 20)
   self:ApplyPercentDiscount(1 - (discountPercent / 100))
