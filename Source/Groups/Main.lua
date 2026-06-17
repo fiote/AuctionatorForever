@@ -8,6 +8,7 @@ function Auctionator.Groups.Initialize()
       Version = 1,
       CustomGroups = {},
       HiddenItems = {},
+      TempHiddenItems = {},
     }
 
     Auctionator.Groups.AddGroup("FAVOURITES")
@@ -21,6 +22,8 @@ function Auctionator.Groups.Initialize()
     AUCTIONATOR_SELLING_GROUPS.CustomGroups = AUCTIONATOR_SELLING_GROUPS.CustomSections
     AUCTIONATOR_SELLING_GROUPS.CustomSections = nil
   end
+  AUCTIONATOR_SELLING_GROUPS.TempHiddenItems = AUCTIONATOR_SELLING_GROUPS.TempHiddenItems or {}
+  Auctionator.Groups.PruneTempHiddenItems()
 
   local group1 = AUCTIONATOR_SELLING_GROUPS.CustomGroups[1]
   if group1.name ~= "FAVOURITES_GROUP" and group1.name ~= "FAVOURITES" then

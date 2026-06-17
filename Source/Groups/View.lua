@@ -15,6 +15,7 @@ function AuctionatorGroupsViewMixin:OnLoad()
 
   self.rawItems = {}
   self.hiddenItems = {}
+  self.tempHiddenItems = {}
 
   self.collapsing = {}
 
@@ -68,6 +69,13 @@ function AuctionatorGroupsViewMixin:CacheListLinks()
         table.insert(toCache, link)
       end
     end
+
+    for _, link in ipairs(Auctionator.Groups.GetTempHiddenItemLinks()) do
+      local info = AuctionatorBagCacheFrame:GetByLinkInstant(link, true)
+      if info == nil then
+        table.insert(toCache, link)
+      end
+    end
   end
 
   if #toCache == 0 then
@@ -92,10 +100,16 @@ end
 
 function AuctionatorGroupsViewMixin:RefreshHiddenItems()
   self.hiddenItems = {}
+  self.tempHiddenItems = {}
   if self.hideHiddenItems then
     for _, link in ipairs(AUCTIONATOR_SELLING_GROUPS.HiddenItems) do
       local info = AuctionatorBagCacheFrame:GetByLinkInstant(link, true)
       self.hiddenItems[info.sortKey] = link
+    end
+
+    for _, link in ipairs(Auctionator.Groups.GetTempHiddenItemLinks()) do
+      local info = AuctionatorBagCacheFrame:GetByLinkInstant(link, true)
+      self.tempHiddenItems[info.sortKey] = link
     end
   end
 end
@@ -218,14 +232,16 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
       end
       local keyName = GetKeyName(groupDetails.name, isCustom)
       for _, info in ipairs(infos) do
-        local button = self.buttonPool:Acquire()
-        button:SetClickEvent(self.clickEventName)
-        info.selected = self.selected and self.selected.keyName == keyName and info.sortKey == self.selected.sortKey
-        info.group = groupDetails.name
-        info.isCustom = isCustom
-        button:SetSize(iconSize, iconSize)
-        button:SetItemInfo(info)
-        group:AddButton(button)
+        if not self.tempHiddenItems[info.sortKey] then
+          local button = self.buttonPool:Acquire()
+          button:SetClickEvent(self.clickEventName)
+          info.selected = self.selected and self.selected.keyName == keyName and info.sortKey == self.selected.sortKey
+          info.group = groupDetails.name
+          info.isCustom = isCustom
+          button:SetSize(iconSize, iconSize)
+          button:SetItemInfo(info)
+          group:AddButton(button)
+        end
       end
     end
   end
@@ -240,7 +256,7 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
   end
 
   for _, item in ipairs(self.rawItems) do
-    if item.auctionable and not self.hiddenItems[item.sortKey] and (item.quality ~= Enum.ItemQuality.Poor or Auctionator.Utilities.IsEquipment(item.classID))  then
+    if item.auctionable and not self.hiddenItems[item.sortKey] and not self.tempHiddenItems[item.sortKey] and (item.quality ~= Enum.ItemQuality.Poor or Auctionator.Utilities.IsEquipment(item.classID))  then
       local index = classIDMap[item.classID]
       if index ~= nil then
         local button = self.buttonPool:Acquire()

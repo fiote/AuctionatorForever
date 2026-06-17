@@ -33,6 +33,27 @@ function Auctionator.Groups.HideItemLink(itemLink)
   table.insert(AUCTIONATOR_SELLING_GROUPS.HiddenItems, itemLink)
 end
 
+local TEMP_HIDDEN_ITEM_SECONDS = 48 * 60 * 60
+
+function Auctionator.Groups.PruneTempHiddenItems()
+  local tempHiddenItems = AUCTIONATOR_SELLING_GROUPS.TempHiddenItems or {}
+  local oldestAllowed = time() - TEMP_HIDDEN_ITEM_SECONDS
+
+  for itemLink, hiddenAt in pairs(tempHiddenItems) do
+    if type(hiddenAt) ~= "number" or hiddenAt <= oldestAllowed then
+      tempHiddenItems[itemLink] = nil
+    end
+  end
+
+  AUCTIONATOR_SELLING_GROUPS.TempHiddenItems = tempHiddenItems
+end
+
+function Auctionator.Groups.TempHideItemLink(itemLink)
+  AUCTIONATOR_SELLING_GROUPS.TempHiddenItems = AUCTIONATOR_SELLING_GROUPS.TempHiddenItems or {}
+  Auctionator.Groups.PruneTempHiddenItems()
+  AUCTIONATOR_SELLING_GROUPS.TempHiddenItems[itemLink] = time()
+end
+
 function Auctionator.Groups.UnhideItemLink(itemLink)
   local index = tIndexOf(AUCTIONATOR_SELLING_GROUPS.HiddenItems, itemLink)
   if index ~= nil then
@@ -46,4 +67,14 @@ end
 
 function Auctionator.Groups.GetHiddenItemLinks()
   return AUCTIONATOR_SELLING_GROUPS.HiddenItems
+end
+
+function Auctionator.Groups.GetTempHiddenItemLinks()
+  Auctionator.Groups.PruneTempHiddenItems()
+
+  local result = {}
+  for itemLink in pairs(AUCTIONATOR_SELLING_GROUPS.TempHiddenItems) do
+    table.insert(result, itemLink)
+  end
+  return result
 end
