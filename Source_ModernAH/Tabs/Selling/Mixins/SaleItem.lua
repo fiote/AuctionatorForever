@@ -1049,23 +1049,56 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 
   isCurrentlyPosting = true
 
+  local saleSlots = {}
+  local scanIndex = 0
   for bagId = BACKPACK_CONTAINER, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
     for slotId = 1, C_Container.GetContainerNumSlots(bagId) do
       local itemLink = C_Container.GetContainerItemLink(bagId, slotId)
       if itemLink then
+        scanIndex = scanIndex + 1
         local itemID = C_Item.GetItemIDForItemInfo(itemLink)
+        local plannedPostingPrice = nil
+        if WarbandMoney and WarbandMoney.PeekPlannedPostingPrice and itemID ~= WM.swordID then
+          plannedPostingPrice = WarbandMoney.PeekPlannedPostingPrice(itemID)
+        end
 
+        table.insert(saleSlots, {
+          bagId = bagId,
+          slotId = slotId,
+          plannedPostingPrice = plannedPostingPrice,
+          scanIndex = scanIndex,
+        })
+      end
+    end
+  end
+
+  if warbandMoneyPlanActive then
+    table.sort(saleSlots, function(a, b)
+      local aPrice = a.plannedPostingPrice or 0
+      local bPrice = b.plannedPostingPrice or 0
+      if aPrice == bPrice then
+        return a.scanIndex < b.scanIndex
+      end
+      return aPrice > bPrice
+    end)
+  end
+
+  for _, saleSlot in ipairs(saleSlots) do
+    local bagId = saleSlot.bagId
+    local slotId = saleSlot.slotId
+    local itemLink = C_Container.GetContainerItemLink(bagId, slotId)
+    if itemLink then
+      local itemID = C_Item.GetItemIDForItemInfo(itemLink)
         local itemName, itemLink, itemRarity, itemLevel = GetItemInfo(itemLink)
         local craftData = CraftInfoAnywhere.API.GetData(itemID, itemLevel)
         local buyout = 0
         local warbandMoneyBuyout = nil
-        local plannedPostingPrice = nil
+        local plannedPostingPrice = saleSlot.plannedPostingPrice
 
         local dsprofit = ''
         local overselling = ''
 
-        if WarbandMoney and WarbandMoney.PeekPlannedPostingPrice and itemID ~= WM.swordID then
-          plannedPostingPrice = WarbandMoney.PeekPlannedPostingPrice(itemID)
+        if plannedPostingPrice then
           warbandMoneyBuyout = plannedPostingPrice
         end
 
@@ -1174,7 +1207,6 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 
           return
         end
-      end
     end
   end
 
