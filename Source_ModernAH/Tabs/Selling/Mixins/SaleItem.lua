@@ -3,6 +3,13 @@ local SALE_ITEM_EVENTS = {
   Auctionator.AH.Events.ItemSearchResultsReady,
 }
 
+local POSTING_EVENTS = {
+  "AUCTION_HOUSE_AUCTION_CREATED",
+  "AUCTION_HOUSE_POST_ERROR",
+  "AUCTION_HOUSE_POST_WARNING",
+  "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
+}
+
 -- Necessary because attempting to post an auction with copper value silently
 -- fails
 local function NormalizePrice(price)
@@ -111,6 +118,7 @@ function AuctionatorSaleItemMixin:OnLoad()
 end
 
 function AuctionatorSaleItemMixin:OnShow()
+  FrameUtil.RegisterFrameForEvents(self, POSTING_EVENTS)
   Auctionator.EventBus:Register(self, {
     Auctionator.Selling.Events.BagItemClicked,
     Auctionator.Selling.Events.ClearBagItem,
@@ -120,6 +128,7 @@ function AuctionatorSaleItemMixin:OnShow()
     Auctionator.AH.Events.ThrottleUpdate,
     Auctionator.Selling.Events.PriceSelected,
     Auctionator.Selling.Events.RefreshSearch,
+    Auctionator.Selling.Events.OwnedAuctionsQueryPending,
     Auctionator.Components.Events.EnterPressed,
   })
   Auctionator.EventBus:RegisterSource(self, "AuctionatorSaleItemMixin")
@@ -141,6 +150,12 @@ function AuctionatorSaleItemMixin:OnShow()
   self.nextItem = nil
   self.prevItem = nil
   self.priceCheckPassed = true
+  self.ownedAuctionsQueryPending = false
+  self.sellSearchPending = false
+  self.sellSearchSequence = 0
+  self.manualPostingPending = false
+  self.pendingPostNextItem = nil
+  self.pendingPostBuyout = nil
 
   self:UpdateSkipButton()
   self:Reset()
@@ -156,6 +171,7 @@ function AuctionatorSaleItemMixin:OnShow()
 end
 
 function AuctionatorSaleItemMixin:OnHide()
+  FrameUtil.UnregisterFrameForEvents(self, POSTING_EVENTS)
   Auctionator.EventBus:Unregister(self, {
     Auctionator.Selling.Events.BagItemClicked,
     Auctionator.Selling.Events.ClearBagItem,
@@ -165,6 +181,7 @@ function AuctionatorSaleItemMixin:OnHide()
     Auctionator.AH.Events.ThrottleUpdate,
     Auctionator.Selling.Events.PriceSelected,
     Auctionator.Selling.Events.RefreshSearch,
+    Auctionator.Selling.Events.OwnedAuctionsQueryPending,
     Auctionator.Components.Events.EnterPressed,
   })
   if self.saleItemEventsRegistered then
@@ -337,6 +354,7 @@ end
 
 function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
   if event == Auctionator.Selling.Events.BagItemClicked then
+    self.pendingPostBuyout = nil
     self:UnlockItem()
     local itemInfo = ...
     Auctionator.AH.GetItemKeyInfo(C_AuctionHouse.MakeItemKey(itemInfo.itemID), function(itemKeyInfo)
@@ -367,12 +385,20 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
     end)
 
   elseif event == Auctionator.Selling.Events.ClearBagItem then
+    self.pendingPostBuyout = nil
     self.nextItem = nil
     self.prevItem = nil
     self.lastKey = nil
     self:Reset()
+    if self.manualPostingPending then
+      self:FinishManualPosting()
+    end
 
   elseif event == Auctionator.AH.Events.ThrottleUpdate then
+    self:UpdatePostButtonState()
+
+  elseif event == Auctionator.Selling.Events.OwnedAuctionsQueryPending then
+    self.ownedAuctionsQueryPending = ...
     self:UpdatePostButtonState()
 
   elseif event == Auctionator.Selling.Events.RequestPost then
@@ -382,6 +408,7 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
     self:PostItem(true)
 
   elseif event == Auctionator.Selling.Events.SkipItem then
+    self.pendingPostBuyout = nil
     self:SkipItem()
 
   elseif event == Auctionator.Components.Events.EnterPressed then
@@ -414,7 +441,9 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
       return
     end
 
+    local searchSequence = self.sellSearchSequence
     self:ProcessCommodityResults(...)
+    self:CompleteSellSearch(searchSequence)
     self.saleItemEventsRegistered = false
     Auctionator.EventBus:Unregister(self, SALE_ITEM_EVENTS)
 
@@ -425,20 +454,22 @@ function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
       return
     end
 
+    local searchSequence = self.sellSearchSequence
     local item = Item:CreateFromItemID(itemKey.itemID)
     item:ContinueOnItemLoad(function()
       self:ProcessItemResults(itemKey)
+      self:CompleteSellSearch(searchSequence)
     end)
     self.saleItemEventsRegistered = false
     Auctionator.EventBus:Unregister(self, SALE_ITEM_EVENTS)
   end
 end
 
-function AuctionatorSaleItemMixin:Update()
+function AuctionatorSaleItemMixin:Update(skipSearch)
   self:UpdateVisuals()
 
   if self.itemInfo ~= nil then
-    self:UpdateForNewItem()
+    self:UpdateForNewItem(skipSearch)
   else
     self:UpdateForNoItem()
   end
@@ -487,7 +518,7 @@ function AuctionatorSaleItemMixin:SetItemName()
   self.TitleArea.Text:SetText(itemName)
 end
 
-function AuctionatorSaleItemMixin:UpdateForNewItem()
+function AuctionatorSaleItemMixin:UpdateForNewItem(skipSearch)
   self:SetDuration()
 
   self.MaxButton:Disable() -- Disable needed for case quantity is 0
@@ -509,7 +540,9 @@ function AuctionatorSaleItemMixin:UpdateForNewItem()
     end
   end)
 
-  self:DoSearch(self.itemInfo)
+  if not skipSearch then
+    self:DoSearch(self.itemInfo)
+  end
 end
 
 function AuctionatorSaleItemMixin:UpdateForNoItem()
@@ -547,6 +580,14 @@ function AuctionatorSaleItemMixin:SetQuantity()
 end
 
 function AuctionatorSaleItemMixin:DoSearch(itemInfo, ...)
+  self.sellSearchSequence = self.sellSearchSequence + 1
+  self.sellSearchPending = true
+  self:UpdatePostButtonState()
+
+  if self.manualPostingPending then
+    self:FinishManualPosting()
+  end
+
   Auctionator.EventBus:Register(self, SALE_ITEM_EVENTS)
   self.saleItemEventsRegistered = true
 
@@ -581,10 +622,21 @@ function AuctionatorSaleItemMixin:DoSearch(itemInfo, ...)
   Auctionator.EventBus:Fire(self, Auctionator.Selling.Events.SellSearchStart, self.expectedItemKey, itemInfo.itemLink, originalKey)
 end
 
-function AuctionatorSaleItemMixin:Reset()
+function AuctionatorSaleItemMixin:CompleteSellSearch(searchSequence)
+  C_Timer.After(0, function()
+    if self.sellSearchSequence ~= searchSequence then
+      return
+    end
+
+    self.sellSearchPending = false
+    self:UpdatePostButtonState()
+  end)
+end
+
+function AuctionatorSaleItemMixin:Reset(skipSearch)
   self:UnlockItem()
 
-  self:Update()
+  self:Update(skipSearch)
 end
 
 function AuctionatorSaleItemMixin:UpdateSalesPrice(salesPrice, bidPrice, preserveBidPrice)
@@ -621,6 +673,45 @@ function AuctionatorSaleItemMixin:SetEquipmentMultiplier(itemLink)
 end
 
 function AuctionatorSaleItemMixin:OnEvent(eventName, ...)
+  if eventName == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" and self.sellSearchPending then
+    self:CompleteSellSearch(self.sellSearchSequence)
+  end
+
+  if not self.manualPostingPending then
+    return
+  end
+
+  if eventName == "AUCTION_HOUSE_AUCTION_CREATED" then
+    self:ContinueAfterManualPosting()
+
+  elseif eventName == "AUCTION_HOUSE_POST_ERROR" or
+         eventName == "AUCTION_HOUSE_POST_WARNING" or
+         eventName == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" then
+    self:FinishManualPosting()
+  end
+end
+
+function AuctionatorSaleItemMixin:ContinueAfterManualPosting()
+  local nextItem = self.pendingPostNextItem
+  self.pendingPostNextItem = nil
+
+  if nextItem then
+    Auctionator.EventBus:Fire(
+      self, Auctionator.Selling.Events.BagItemRequest, nextItem
+    )
+  elseif self.lastItemInfo then
+    -- DoSearch queues the request when the AH is throttled, while
+    -- sellSearchPending keeps Post disabled throughout that wait.
+    self:DoSearch(self.lastItemInfo)
+  else
+    self:FinishManualPosting()
+  end
+end
+
+function AuctionatorSaleItemMixin:FinishManualPosting()
+  self.manualPostingPending = false
+  self.pendingPostNextItem = nil
+  self:UpdatePostButtonState()
 end
 
 function AuctionatorSaleItemMixin:GetCommodityResult(itemID)
@@ -867,11 +958,23 @@ function AuctionatorSaleItemMixin:GetPostButtonState()
     ) and
 
     -- Not throttled (to avoid silent post failure)
-    Auctionator.AH.IsNotThrottled()
+    Auctionator.AH.IsNotThrottled() and
+
+    -- Keep disabled for the entire search, including gaps between queued AH
+    -- operations where the Blizzard throttle may briefly report ready.
+    not self.sellSearchPending and
+
+    -- Posting completion is asynchronous. Keep disabled until the
+    -- auction-created event starts the next selection/search.
+    not self.manualPostingPending and
+
+    -- Wait for owned auctions to load before enabling to avoid briefly
+    -- enabling between the price search and QueryOwnedAuctions.
+    not self.ownedAuctionsQueryPending
 end
 
-function AuctionatorSaleItemMixin:GetConfirmationMessage()
-  local effectiveUnitPrice = self.Price:GetAmount()
+function AuctionatorSaleItemMixin:GetConfirmationMessage(postBuyout)
+  local effectiveUnitPrice = postBuyout or self.Price:GetAmount()
   if Auctionator.Config.Get(Auctionator.Config.Options.SHOW_SELLING_BID_PRICE) and effectiveUnitPrice == 0 then
     effectiveUnitPrice = self.BidPrice:GetAmount()
   end
@@ -892,20 +995,18 @@ function AuctionatorSaleItemMixin:GetConfirmationMessage()
   end
 end
 
-function AuctionatorSaleItemMixin:RequiresConfirmationState()
+function AuctionatorSaleItemMixin:RequiresConfirmationState(postBuyout)
   return
     Auctionator.Config.Get(Auctionator.Config.Options.SELLING_CONFIRM_LOW_PRICE) and
-    self:GetConfirmationMessage() ~= nil
+    self:GetConfirmationMessage(postBuyout) ~= nil
 end
 
 function AuctionatorSaleItemMixin:UpdatePostButtonState()
   self:UpdatePostAndSkipButtonLayout()
 
-  if self:GetPostButtonState() then
-    self.PostButton:Enable()
-  else
-    self.PostButton:Disable()
-  end
+  local enabled = self:GetPostButtonState()
+  self.PostButton:SetEnabled(enabled)
+  self.DiscountZButton:SetEnabled(enabled)
 end
 
 function AuctionatorSaleItemMixin:UpdateSkipButtonState()
@@ -1219,13 +1320,13 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   AuctionatorShoppingFrame:RunAutoLogic()
 end
 
-function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
+function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier)
   local currentPrice = self:GetHistoricalDiscountPrice()
 
   if currentPrice == nil then
     -- Do not apply discount if the cheapest price is from the current character
     if self.cheapestCommodityResult and self.cheapestCommodityResult.containsOwnerItem and self.cheapestCommodityResult.owners[1] == "player" then
-      return
+      return nil
     end
 
     local itemKey = self.expectedItemKey
@@ -1234,7 +1335,7 @@ function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
       local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
       local isOwner = result.containsOwnerItem and result.owners[1] == "player"
       if isOwner then
-        return
+        return nil
       end
     end
 
@@ -1245,9 +1346,10 @@ function AuctionatorSaleItemMixin:ApplyPercentDiscount(multiplier)
     -- Calculate the discounted price and round up
     local discountedPrice = math.ceil(currentPrice * multiplier)
     -- Normalize the price to meet AH requirements
-    discountedPrice = NormalizePrice(discountedPrice)
-    self.Price:SetAmount(discountedPrice)
+    return NormalizePrice(discountedPrice)
   end
+
+  return nil
 end
 
 function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
@@ -1283,20 +1385,27 @@ function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
   end
   local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
   local discountPercent = math.min(math.max(expiredCount, 0), 20)
-  self:ApplyPercentDiscount(1 - (discountPercent / 100))
-  self:PostItem()
+  local discountedPrice = self:GetPercentDiscountPrice(1 - (discountPercent / 100))
+  self:PostItem(false, discountedPrice)
 end
 
-function AuctionatorSaleItemMixin:PostItem(confirmed)
+function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
+  if not confirmed then
+    self.pendingPostBuyout = requestedBuyout
+  end
+
+  local postBuyout = self.pendingPostBuyout or self.Price:GetAmount()
+
   if not self:GetPostButtonState() then
+    self.pendingPostBuyout = nil
     Auctionator.Debug.Message("Trying to post when we can't. Returning")
     return
-  elseif not confirmed and self:RequiresConfirmationState() then
+  elseif not confirmed and self:RequiresConfirmationState(postBuyout) then
     if self.SkipButton:IsEnabled() then
-      StaticPopupDialogs[Auctionator.Constants.DialogNames.SellingConfirmPostSkip].text = self:GetConfirmationMessage()
+      StaticPopupDialogs[Auctionator.Constants.DialogNames.SellingConfirmPostSkip].text = self:GetConfirmationMessage(postBuyout)
       StaticPopup_Show(Auctionator.Constants.DialogNames.SellingConfirmPostSkip)
     else
-      StaticPopupDialogs[Auctionator.Constants.DialogNames.SellingConfirmPost].text = self:GetConfirmationMessage()
+      StaticPopupDialogs[Auctionator.Constants.DialogNames.SellingConfirmPost].text = self:GetConfirmationMessage(postBuyout)
       StaticPopup_Show(Auctionator.Constants.DialogNames.SellingConfirmPost)
     end
     return
@@ -1305,8 +1414,16 @@ function AuctionatorSaleItemMixin:PostItem(confirmed)
   local quantity = self.Quantity:GetNumber()
   local duration = self:GetDuration()
   local startingBid = self.BidPrice:GetAmount()
-  local buyout = self.Price:GetAmount()
+  local buyout = postBuyout
   local bidAmountReported = nil -- Only includes bid price when non-zero and for an item
+  self.pendingPostBuyout = nil
+
+  self.manualPostingPending = true
+  self.pendingPostNextItem = nil
+  if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) then
+    self.pendingPostNextItem = self.nextItem
+  end
+  self:UpdatePostButtonState()
 
   self.MultisellProgress:SetDetails(self.itemInfo.iconTexture, quantity)
 
@@ -1377,20 +1494,10 @@ function AuctionatorSaleItemMixin:PostItem(confirmed)
 
   -- Save item info for refreshing search results
   self.lastItemInfo = self.itemInfo
-  self:Reset()
-
-  if (Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) and
-      self.nextItem
-     ) then
-    -- Option to automatically select the next item in the bag view
-    Auctionator.EventBus:Fire(
-      self, Auctionator.Selling.Events.BagItemRequest, self.nextItem
-    )
-
-  else
-    -- Search for current auctions of the last item posted
-    self:DoSearch(self.lastItemInfo)
-  end
+  -- Refresh the controls without starting another search. The single
+  -- post-processing search/selection is started after the Blizzard posting
+  -- event and throttle completion.
+  self:Reset(true)
 end
 
 function AuctionatorSaleItemMixin:SkipItem()

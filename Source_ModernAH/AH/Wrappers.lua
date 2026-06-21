@@ -43,6 +43,14 @@ function Auctionator.AH.QueryOwnedAuctions(...)
   end)
 end
 
+function Auctionator.AH.QueryOwnedAuctionsWithCallback(onSent, ...)
+  local args = {...}
+  Auctionator.AH.Queue:Enqueue(function()
+    C_AuctionHouse.QueryOwnedAuctions(unpack(args))
+    onSent()
+  end)
+end
+
 local sentBrowseQuery = true
 function Auctionator.AH.SendBrowseQuery(...)
   local args = {...}

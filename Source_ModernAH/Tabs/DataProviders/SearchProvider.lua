@@ -59,6 +59,9 @@ local SEARCH_EVENTS = {
   "COMMODITY_SEARCH_RESULTS_UPDATED",
   "COMMODITY_PURCHASE_SUCCEEDED",
   "ITEM_SEARCH_RESULTS_UPDATED",
+  "OWNED_AUCTIONS_UPDATED",
+  "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
+  "AUCTION_HOUSE_THROTTLED_SYSTEM_READY",
 }
 
 AuctionatorSearchDataProviderMixin = CreateFromMixins(AuctionatorDataProviderMixin)
@@ -72,6 +75,10 @@ function AuctionatorSearchDataProviderMixin:OnShow()
     Auctionator.Cancelling.Events.RequestCancel,
   })
 
+  self.ownedAuctionsQueryPending = false
+  self.ownedAuctionsQueryRequested = false
+  self.ownedAuctionsQuerySent = false
+  self.ownedAuctionsUpdated = false
   self:Reset()
 end
 
@@ -155,6 +162,16 @@ function AuctionatorSearchDataProviderMixin:OnEvent(eventName, itemRef, auctionI
     self:UnregisterEvent("AUCTION_CANCELED")
     self.onPreserveScroll()
     self:RefreshView()
+
+  elseif eventName == "OWNED_AUCTIONS_UPDATED" and self.ownedAuctionsQuerySent then
+    self.ownedAuctionsUpdated = true
+    self:CompleteOwnedAuctionsQueryIfReady()
+
+  elseif eventName == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" and self.ownedAuctionsQuerySent then
+    self:ResetOwnedAuctionsQuery()
+
+  elseif eventName == "AUCTION_HOUSE_THROTTLED_SYSTEM_READY" and self.ownedAuctionsQuerySent then
+    self:CompleteOwnedAuctionsQueryIfReady()
   end
 end
 
@@ -168,6 +185,43 @@ end
 
 local function cancelShortcutEnabled()
   return Auctionator.Config.Get(Auctionator.Config.Options.SELLING_CANCEL_SHORTCUT) ~= Auctionator.Config.Shortcuts.NONE
+end
+
+function AuctionatorSearchDataProviderMixin:SetOwnedAuctionsQueryPending(pending)
+  if self.ownedAuctionsQueryPending == pending then
+    return
+  end
+
+  self.ownedAuctionsQueryPending = pending
+  Auctionator.EventBus
+    :RegisterSource(self, "AuctionatorSearchDataProviderMixin")
+    :Fire(self, Auctionator.Selling.Events.OwnedAuctionsQueryPending, pending)
+    :UnregisterSource(self)
+end
+
+function AuctionatorSearchDataProviderMixin:ResetOwnedAuctionsQuery()
+  self.ownedAuctionsQueryRequested = false
+  self.ownedAuctionsQuerySent = false
+  self.ownedAuctionsUpdated = false
+  self:SetOwnedAuctionsQueryPending(false)
+end
+
+function AuctionatorSearchDataProviderMixin:CompleteOwnedAuctionsQueryIfReady()
+  if self.ownedAuctionsUpdated and Auctionator.AH.IsNotThrottled() then
+    self:ResetOwnedAuctionsQuery()
+  end
+end
+
+function AuctionatorSearchDataProviderMixin:RequestOwnedAuctionsIfNeeded(anyOwnedNotLoaded)
+  if anyOwnedNotLoaded and cancelShortcutEnabled() and not self.ownedAuctionsQueryRequested then
+    self.ownedAuctionsQueryRequested = true
+    self:SetOwnedAuctionsQueryPending(true)
+    Auctionator.AH.QueryOwnedAuctionsWithCallback(function()
+      self.ownedAuctionsQuerySent = true
+    end, {})
+  elseif not self.ownedAuctionsQueryRequested then
+    self:SetOwnedAuctionsQueryPending(false)
+  end
 end
 
 function AuctionatorSearchDataProviderMixin:ProcessCommodityResults(itemID)
@@ -219,9 +273,7 @@ function AuctionatorSearchDataProviderMixin:ProcessCommodityResults(itemID)
   -- called if an auction exists that hasn't been loaded for cancelling yet.
   -- If a user really really wants to avoid an extra request they can turn the
   -- feature off.
-  if anyOwnedNotLoaded and cancelShortcutEnabled() then
-    Auctionator.AH.QueryOwnedAuctions({})
-  end
+  self:RequestOwnedAuctionsIfNeeded(anyOwnedNotLoaded)
 
   return entries
 end
@@ -230,25 +282,24 @@ function AuctionatorSearchDataProviderMixin:ProcessItemResults(itemKey)
   local entries = {}
   local anyOwnedNotLoaded = false
 
+  if cancelShortcutEnabled() and not self.ownedAuctionsQueryRequested then
+    self:SetOwnedAuctionsQueryPending(true)
+  end
+
   local item = Item:CreateFromItemID(itemKey.itemID)
   item:ContinueOnItemLoad(function()
     for index = 1, C_AuctionHouse.GetNumItemSearchResults(itemKey) do
       local resultInfo = C_AuctionHouse.GetItemSearchResultInfo(itemKey, index)
       if Auctionator.Selling.DoesItemMatchFromKey(self.originalItemKey, self.originalItemLink, resultInfo.itemKey, resultInfo.itemLink) then
         local entry = Auctionator.Search.GetBuyItemResult(resultInfo)
-        -- Test if the auction has been loaded for cancelling
         if resultInfo.containsOwnerItem and not C_AuctionHouse.CanCancelAuction(resultInfo.auctionID) then
           anyOwnedNotLoaded = true
         end
-
         table.insert(entries, entry)
       end
     end
 
-    -- See comment in ProcessCommodityResults
-    if anyOwnedNotLoaded and cancelShortcutEnabled() then
-      Auctionator.AH.QueryOwnedAuctions({})
-    end
+    self:RequestOwnedAuctionsIfNeeded(anyOwnedNotLoaded)
     self:AppendEntries(entries, true)
   end)
 end
