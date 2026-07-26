@@ -97,13 +97,11 @@ local function GetDisplayQualityTier(itemInfo)
 end
 
 local function GetExpiredSinceLastSale(itemLink)
-  if Auctionator.Selling == nil or
-     Auctionator.Selling.TSMAccounting == nil or
-     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) ~= "function" then
+  if type(Auctionator.GetExpiredSinceLastSale) ~= "function" then
     return 0
   end
 
-  return Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(itemLink) or 0
+  return Auctionator.GetExpiredSinceLastSale(itemLink) or 0
 end
 
 function AuctionatorGroupsViewItemMixin:SetClickEvent(eventName)

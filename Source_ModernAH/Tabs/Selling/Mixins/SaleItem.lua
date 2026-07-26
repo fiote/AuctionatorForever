@@ -99,14 +99,11 @@ end
 
 local function GetExpiredSinceLastSale(itemInfo)
   if itemInfo == nil or
-     itemInfo.itemLink == nil or
-     Auctionator.Selling == nil or
-     Auctionator.Selling.TSMAccounting == nil or
-     type(Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale) ~= "function" then
+     type(Auctionator.GetExpiredSinceLastSale) ~= "function" then
     return 0
   end
 
-  return Auctionator.Selling.TSMAccounting.GetExpiredSinceLastSale(itemInfo.itemLink) or 0
+  return Auctionator.GetExpiredSinceLastSale(itemInfo) or 0
 end
 
 AuctionatorSaleItemMixin = {}
@@ -1502,7 +1499,12 @@ end
 
 function AuctionatorSaleItemMixin:SkipItem()
   if self.SkipButton:IsEnabled() then
-    local skippedItemLink = self.itemInfo and self.itemInfo.itemLink
+    local skippedItemInfo = self.itemInfo
+    local skippedItemLink = skippedItemInfo and skippedItemInfo.itemLink
+    if skippedItemInfo and type(Auctionator.IncrementExpiredSinceLastSaleAdjustment) == "function" then
+      Auctionator.IncrementExpiredSinceLastSaleAdjustment(skippedItemInfo, self.Quantity:GetNumber())
+    end
+
     if skippedItemLink then
       Auctionator.Groups.TempHideItemLink(skippedItemLink)
     end

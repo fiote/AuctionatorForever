@@ -1,4 +1,5 @@
 <!-- Selling directory manifest -->
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
   <Include file="Events.lua" />
+  <Script file="ExpiredSinceLastSale.lua" />
 </Ui>
