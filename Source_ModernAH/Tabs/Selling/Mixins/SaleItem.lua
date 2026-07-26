@@ -1003,6 +1003,7 @@ function AuctionatorSaleItemMixin:UpdatePostButtonState()
 
   local enabled = self:GetPostButtonState()
   self.PostButton:SetEnabled(enabled)
+  self.AvgSaleButton:SetEnabled(enabled)
   self.DiscountZButton:SetEnabled(enabled)
 end
 
@@ -1384,6 +1385,35 @@ function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
   local discountPercent = math.min(math.max(expiredCount, 0), 20)
   local discountedPrice = self:GetPercentDiscountPrice(1 - (discountPercent / 100))
   self:PostItem(false, discountedPrice)
+end
+
+function AuctionatorSaleItemMixin:PostAtTSMRegionSaleAverage()
+  if self.itemInfo == nil then
+    return
+  end
+
+  if TSM_API == nil or
+     type(TSM_API.ToItemString) ~= "function" or
+     type(TSM_API.GetCustomPriceValue) ~= "function" then
+    Auctionator.Utilities.Message("TSM is unavailable.")
+    return
+  end
+
+  local success, regionSaleAverage = pcall(function()
+    local itemString = TSM_API.ToItemString(self.itemInfo.itemLink)
+    if itemString == nil then
+      return nil
+    end
+
+    return TSM_API.GetCustomPriceValue("DBRegionSaleAvg", itemString)
+  end)
+
+  if not success or regionSaleAverage == nil or regionSaleAverage <= 0 then
+    Auctionator.Utilities.Message("TSM Region Sale Avg is unavailable for this item.")
+    return
+  end
+
+  self:PostItem(false, NormalizePrice(regionSaleAverage))
 end
 
 function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
