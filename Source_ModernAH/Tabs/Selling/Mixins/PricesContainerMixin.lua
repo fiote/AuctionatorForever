@@ -39,6 +39,15 @@ function AuctionatorSellingTabPricesContainerMixin:SetView(viewIndex)
   elseif viewIndex == YOUR_VIEW then
     self:GetParent().PostingHistoryListing:Show()
   end
+
+  local saleItemFrame = self:GetParent().SaleItemFrame
+  if saleItemFrame ~= nil then
+    if viewIndex == CURRENT_VIEW then
+      saleItemFrame:ApplyCurrentPriceToForm()
+    elseif viewIndex == REALM_VIEW then
+      saleItemFrame:ApplyHistoricalDiscountPriceToForm()
+    end
+  end
 end
 
 function AuctionatorSellingTabPricesContainerMixin:IsPriceHistoryView()

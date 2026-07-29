@@ -626,6 +626,12 @@ function AuctionatorSaleItemMixin:CompleteSellSearch(searchSequence)
     end
 
     self.sellSearchPending = false
+    local parent = self:GetParent()
+    if parent ~= nil and
+       parent.PricesTabsContainer ~= nil and
+       parent.PricesTabsContainer:IsPriceHistoryView() then
+      self:ApplyHistoricalDiscountPriceToForm()
+    end
     self:UpdatePostButtonState()
   end)
 end
@@ -1318,8 +1324,8 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   AuctionatorShoppingFrame:RunAutoLogic()
 end
 
-function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier)
-  local currentPrice = self:GetHistoricalDiscountPrice()
+function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier, expiredCount)
+  local currentPrice = self:GetHistoricalDiscountPrice(expiredCount)
 
   if currentPrice == nil then
     -- Do not apply discount if the cheapest price is from the current character
@@ -1329,7 +1335,7 @@ function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier)
 
     local itemKey = self.expectedItemKey
 
-    if C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
+    if itemKey ~= nil and C_AuctionHouse.GetNumItemSearchResults(itemKey) > 0 then
       local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
       local isOwner = result.containsOwnerItem and result.owners[1] == "player"
       if isOwner then
@@ -1350,7 +1356,7 @@ function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier)
   return nil
 end
 
-function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
+function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice(expiredCount)
   local parent = self:GetParent()
   if self.itemInfo == nil or parent == nil or parent.PricesTabsContainer == nil or not parent.PricesTabsContainer:IsPriceHistoryView() then
     return nil
@@ -1362,18 +1368,63 @@ function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice()
   end
 
   local historicalPrices = Auctionator.Database:GetPriceHistory(historicalPriceProvider.lastDBKey)
-  local lowestHistoricalPrice = nil
+  local distinctHistoricalPrices = {}
+  local seenHistoricalPrices = {}
 
   for _, historicalPrice in ipairs(historicalPrices) do
-    if historicalPrice.minSeen ~= nil and (
-      lowestHistoricalPrice == nil or
-      historicalPrice.minSeen < lowestHistoricalPrice
-    ) then
-      lowestHistoricalPrice = historicalPrice.minSeen
+    if historicalPrice.minSeen ~= nil and not seenHistoricalPrices[historicalPrice.minSeen] then
+      seenHistoricalPrices[historicalPrice.minSeen] = true
+      table.insert(distinctHistoricalPrices, historicalPrice.minSeen)
     end
   end
 
-  return lowestHistoricalPrice
+  table.sort(distinctHistoricalPrices, function(left, right)
+    return left > right
+  end)
+
+  if #distinctHistoricalPrices == 0 then
+    return nil
+  end
+
+  local priceIndex = math.min(math.max(math.floor(tonumber(expiredCount) or 0), 1), #distinctHistoricalPrices)
+  return distinctHistoricalPrices[priceIndex]
+end
+
+function AuctionatorSaleItemMixin:GetExpiredSinceLastSaleDiscountPrice()
+  if self.itemInfo == nil then
+    return nil
+  end
+
+  local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
+  local discountPercent = math.min(math.max(expiredCount, 0), 20)
+  return self:GetPercentDiscountPrice(1 - (discountPercent / 100), expiredCount)
+end
+
+function AuctionatorSaleItemMixin:UpdatePriceDependentState()
+  self:ValidateMinimumPrice()
+  self:UpdatePostButtonState()
+  self:UpdateSkipButtonState()
+end
+
+function AuctionatorSaleItemMixin:ApplyHistoricalDiscountPriceToForm()
+  local discountedPrice = self:GetExpiredSinceLastSaleDiscountPrice()
+  if discountedPrice ~= nil then
+    self:UpdateSalesPrice(discountedPrice)
+  end
+  self:UpdatePriceDependentState()
+end
+
+function AuctionatorSaleItemMixin:ApplyCurrentPriceToForm()
+  if self.itemInfo == nil or self.expectedItemKey == nil then
+    return
+  end
+
+  if self.itemInfo.isCommodity then
+    self:ProcessCommodityResults(self.expectedItemKey.itemID)
+  else
+    self:ProcessItemResults(self.expectedItemKey)
+  end
+  self:UpdatePriceDependentState()
 end
 
 function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
@@ -1381,9 +1432,16 @@ function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
     self:SkipItem()
     return
   end
-  local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
-  local discountPercent = math.min(math.max(expiredCount, 0), 20)
-  local discountedPrice = self:GetPercentDiscountPrice(1 - (discountPercent / 100))
+  local parent = self:GetParent()
+  local isPriceHistoryView = parent ~= nil and
+    parent.PricesTabsContainer ~= nil and
+    parent.PricesTabsContainer:IsPriceHistoryView()
+  local discountedPrice
+  if isPriceHistoryView then
+    discountedPrice = self.Price:GetAmount()
+  else
+    discountedPrice = self:GetExpiredSinceLastSaleDiscountPrice()
+  end
   self:PostItem(false, discountedPrice)
 end
 
