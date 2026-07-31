@@ -1587,11 +1587,7 @@ end
 
 function AuctionatorSaleItemMixin:SkipItem()
   if self.SkipButton:IsEnabled() then
-    local skippedItemInfo = self.itemInfo
-    local skippedItemLink = skippedItemInfo and skippedItemInfo.itemLink
-    if skippedItemInfo and type(Auctionator.IncrementExpiredSinceLastSaleAdjustment) == "function" then
-      Auctionator.IncrementExpiredSinceLastSaleAdjustment(skippedItemInfo, self.Quantity:GetNumber())
-    end
+    local skippedItemLink = self.itemInfo and self.itemInfo.itemLink
 
     if skippedItemLink then
       Auctionator.Groups.TempHideItemLink(skippedItemLink)

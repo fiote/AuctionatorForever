@@ -35,6 +35,12 @@ function Auctionator.Variables.InitializeSavedState()
     AUCTIONATOR_SAVEDVARS = {}
   end
   Auctionator.SavedState = AUCTIONATOR_SAVEDVARS
+
+  -- Expired-since-last-sale counts are now reported straight from TSM, so the
+  -- local per-item adjustment offsets are no longer read or written. Drop any
+  -- that a previous version saved rather than leaving them in the saved
+  -- variables indefinitely.
+  Auctionator.SavedState.ExpiredSinceLastSaleAdjustments = nil
 end
 
 -- Attempt to import from other connected realms (this may happen if another
