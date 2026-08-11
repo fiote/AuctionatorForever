@@ -103,12 +103,12 @@
       </Button>
 
       <Button parentKey="AvgSaleButton" name="AuctionatorAvgSaleButton" inherits="UIPanelButtonTemplate" text="Avg Sale">
-        <Size x="70" y="22"/>
+        <Size x="100" y="22"/>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="TOPLEFT" x="-65" y="27"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.Duration" relativePoint="TOPLEFT" x="-95" y="27"/>
         </Anchors>
         <Scripts>
-          <OnClick>self:GetParent():PostAtTSMRegionSaleAverage()</OnClick>
+          <OnClick>self:GetParent():PostAtAvgSalePrice()</OnClick>
         </Scripts>
       </Button>
       <Button parentKey="DiscountZButton" name="AuctionatorDiscountZButton" inherits="UIPanelButtonTemplate" text="Z%Off">

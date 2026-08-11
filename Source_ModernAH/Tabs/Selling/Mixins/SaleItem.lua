@@ -37,6 +37,10 @@ local function IsEquipment(itemInfo)
   return not itemInfo.isCommodity and Auctionator.Utilities.IsEquipment(itemInfo.classId)
 end
 
+local function IsDecor(itemInfo)
+  return Enum.ItemClass.Housing ~= nil and itemInfo.classId == Enum.ItemClass.Housing
+end
+
 local function RequiresSingleVariantPost(itemInfo)
   return itemInfo ~= nil and IsEquipment(itemInfo) and itemInfo.hasItemIDVariants == true
 end
@@ -521,6 +525,7 @@ function AuctionatorSaleItemMixin:UpdateForNewItem(skipSearch)
   self.MaxButton:Disable() -- Disable needed for case quantity is 0
 
   self:SetQuantity()
+  self:UpdateAvgSalePrice()
 
   Auctionator.Utilities.DBKeyFromLink(self.itemInfo.itemLink, function(dbKeys)
     local price = Auctionator.Database:GetFirstPrice(dbKeys)
@@ -546,6 +551,8 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
   self.Quantity:SetNumber(0)
   self.MaxButton:Disable()
   self:UpdateSalesPrice(0)
+  self.avgSalePrice = nil
+  self.AvgSaleButton:SetText("Avg Sale")
 
   self.DepositPrice:SetText(GetMoneyString(100, true))
   self.TotalPrice:SetText(Auctionator.Utilities.CreatePaddedMoneyString(100, true, true, true))
@@ -632,6 +639,7 @@ function AuctionatorSaleItemMixin:CompleteSellSearch(searchSequence)
        parent.PricesTabsContainer:IsPriceHistoryView() then
       self:ApplyHistoricalDiscountPriceToForm()
     end
+    self:UpdateAvgSalePrice()
     self:UpdatePostButtonState()
   end)
 end
@@ -1009,7 +1017,7 @@ function AuctionatorSaleItemMixin:UpdatePostButtonState()
 
   local enabled = self:GetPostButtonState()
   self.PostButton:SetEnabled(enabled)
-  self.AvgSaleButton:SetEnabled(enabled)
+  self.AvgSaleButton:SetEnabled(enabled and self.avgSalePrice ~= nil)
   self.DiscountZButton:SetEnabled(enabled)
 end
 
@@ -1324,8 +1332,13 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
   AuctionatorShoppingFrame:RunAutoLogic()
 end
 
-function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier, expiredCount)
-  local currentPrice = self:GetHistoricalDiscountPrice(expiredCount)
+function AuctionatorSaleItemMixin:GetPercentDiscountPrice(multiplier, expiredCount, dbKey)
+  local currentPrice
+  if dbKey == nil then
+    currentPrice = self:GetHistoricalDiscountPrice(expiredCount)
+  else
+    currentPrice = self:GetHistoricalDiscountPriceForDBKey(expiredCount, dbKey)
+  end
 
   if currentPrice == nil then
     -- Do not apply discount if the cheapest price is from the current character
@@ -1367,7 +1380,11 @@ function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice(expiredCount)
     return nil
   end
 
-  local historicalPrices = Auctionator.Database:GetPriceHistory(historicalPriceProvider.lastDBKey)
+  return self:GetHistoricalDiscountPriceForDBKey(expiredCount, historicalPriceProvider.lastDBKey)
+end
+
+function AuctionatorSaleItemMixin:GetHistoricalDiscountPriceForDBKey(expiredCount, dbKey)
+  local historicalPrices = Auctionator.Database:GetPriceHistory(dbKey)
   local distinctHistoricalPrices = {}
   local seenHistoricalPrices = {}
 
@@ -1388,6 +1405,72 @@ function AuctionatorSaleItemMixin:GetHistoricalDiscountPrice(expiredCount)
 
   local priceIndex = math.min(math.max(math.floor(tonumber(expiredCount) or 0), 1), #distinctHistoricalPrices)
   return distinctHistoricalPrices[priceIndex]
+end
+
+function AuctionatorSaleItemMixin:GetTSMRegionSaleAverage()
+  if self.itemInfo == nil or
+     TSM_API == nil or
+     type(TSM_API.ToItemString) ~= "function" or
+     type(TSM_API.GetCustomPriceValue) ~= "function" then
+    return nil
+  end
+
+  local success, regionSaleAverage = pcall(function()
+    local itemString = TSM_API.ToItemString(self.itemInfo.itemLink)
+    if itemString == nil then
+      return nil
+    end
+
+    return TSM_API.GetCustomPriceValue("DBRegionSaleAvg", itemString)
+  end)
+
+  if not success or regionSaleAverage == nil or regionSaleAverage <= 0 then
+    return nil
+  end
+
+  return NormalizePrice(regionSaleAverage)
+end
+
+function AuctionatorSaleItemMixin:SetAvgSalePrice(price)
+  self.avgSalePrice = price
+  if price == nil then
+    self.AvgSaleButton:SetText("Avg Sale")
+  else
+    local wholeGoldPrice = math.floor(price / 10000) * 10000
+    self.AvgSaleButton:SetText(Auctionator.Utilities.CreatePaddedMoneyString(wholeGoldPrice, true, true, false))
+  end
+  self:UpdatePostButtonState()
+end
+
+function AuctionatorSaleItemMixin:UpdateAvgSalePrice()
+  local itemInfo = self.itemInfo
+  self:SetAvgSalePrice(nil)
+
+  if itemInfo == nil then
+    return
+  elseif IsEquipment(itemInfo) then
+    local itemLink = itemInfo.itemLink
+    Auctionator.Utilities.DBKeyFromLink(itemLink, function(dbKeys)
+      if self.itemInfo == nil or self.itemInfo.itemLink ~= itemLink then
+        return
+      end
+
+      local dbKey = dbKeys[1]
+      if dbKey == nil then
+        return
+      end
+
+      local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
+      local discountPercent = math.min(math.max(expiredCount, 0), 20)
+      self:SetAvgSalePrice(self:GetPercentDiscountPrice(
+        1 - discountPercent / 100,
+        expiredCount,
+        dbKey
+      ))
+    end)
+  elseif IsDecor(itemInfo) then
+    self:SetAvgSalePrice(self:GetTSMRegionSaleAverage())
+  end
 end
 
 function AuctionatorSaleItemMixin:GetExpiredSinceLastSaleDiscountPrice()
@@ -1445,33 +1528,12 @@ function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
   self:PostItem(false, discountedPrice)
 end
 
-function AuctionatorSaleItemMixin:PostAtTSMRegionSaleAverage()
-  if self.itemInfo == nil then
+function AuctionatorSaleItemMixin:PostAtAvgSalePrice()
+  if self.avgSalePrice == nil then
     return
   end
 
-  if TSM_API == nil or
-     type(TSM_API.ToItemString) ~= "function" or
-     type(TSM_API.GetCustomPriceValue) ~= "function" then
-    Auctionator.Utilities.Message("TSM is unavailable.")
-    return
-  end
-
-  local success, regionSaleAverage = pcall(function()
-    local itemString = TSM_API.ToItemString(self.itemInfo.itemLink)
-    if itemString == nil then
-      return nil
-    end
-
-    return TSM_API.GetCustomPriceValue("DBRegionSaleAvg", itemString)
-  end)
-
-  if not success or regionSaleAverage == nil or regionSaleAverage <= 0 then
-    Auctionator.Utilities.Message("TSM Region Sale Avg is unavailable for this item.")
-    return
-  end
-
-  self:PostItem(false, NormalizePrice(regionSaleAverage))
+  self:PostItem(false, self.avgSalePrice)
 end
 
 function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
