@@ -36,16 +36,24 @@ function Auctionator.AH.SendSellSearchQueryByItemKey(itemKey, sorts, splitOwnedI
   Auctionator.AH.Internals.searchScan:SetSearch(itemKeyGenerator, rawSearch)
 end
 
+local function GetQueue()
+  if Auctionator.AH.Queue == nil then
+    Auctionator.AH.Initialize()
+  end
+
+  return Auctionator.AH.Queue
+end
+
 function Auctionator.AH.QueryOwnedAuctions(...)
   local args = {...}
-  Auctionator.AH.Queue:Enqueue(function()
+  GetQueue():Enqueue(function()
     C_AuctionHouse.QueryOwnedAuctions(unpack(args))
   end)
 end
 
 function Auctionator.AH.QueryOwnedAuctionsWithCallback(onSent, ...)
   local args = {...}
-  Auctionator.AH.Queue:Enqueue(function()
+  GetQueue():Enqueue(function()
     C_AuctionHouse.QueryOwnedAuctions(unpack(args))
     onSent()
   end)
@@ -55,7 +63,7 @@ local sentBrowseQuery = true
 function Auctionator.AH.SendBrowseQuery(...)
   local args = {...}
   sentBrowseQuery = false
-  Auctionator.AH.Queue:Enqueue(function()
+  GetQueue():Enqueue(function()
     sentBrowseQuery = true
     C_AuctionHouse.SendBrowseQuery(unpack(args))
   end)
@@ -67,7 +75,7 @@ end
 
 function Auctionator.AH.RequestMoreBrowseResults(...)
   local args = {...}
-  Auctionator.AH.Queue:Enqueue(function()
+  GetQueue():Enqueue(function()
     C_AuctionHouse.RequestMoreBrowseResults(unpack(args))
   end)
 end
