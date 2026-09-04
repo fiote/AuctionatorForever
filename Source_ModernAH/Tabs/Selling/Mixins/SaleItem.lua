@@ -1187,12 +1187,15 @@ function AuctionatorSaleItemMixin:RunAutoLogic()
 
   if warbandMoneyPlanActive then
     table.sort(saleSlots, function(a, b)
+      if (a.plannedPostingPrice ~= nil) ~= (b.plannedPostingPrice ~= nil) then
+        return a.plannedPostingPrice ~= nil
+      end
       local aPrice = a.plannedPostingPrice or 0
       local bPrice = b.plannedPostingPrice or 0
       if aPrice == bPrice then
         return a.scanIndex < b.scanIndex
       end
-      return aPrice > bPrice
+      return aPrice < bPrice
     end)
   end
 
