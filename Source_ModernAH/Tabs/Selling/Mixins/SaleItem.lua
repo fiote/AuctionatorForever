@@ -1515,6 +1515,7 @@ end
 
 function AuctionatorSaleItemMixin:ApplyExpiredSinceLastSaleDiscount()
   if self:ShouldSwapPostAndSkipButtons() then
+    self:RecordSkippedForBadPrice()
     self:SkipItem()
     return
   end
@@ -1648,6 +1649,30 @@ function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
   -- post-processing search/selection is started after the Blizzard posting
   -- event and throttle completion.
   self:Reset(true)
+end
+
+-- Tells WarbandMoney's shared "expired since last sale" tracker that this
+-- item was skipped by the auto-sell flow for having a bad price, so it can
+-- be counted the same as a real expired auction (see
+-- Source\Selling\ExpiredSinceLastSale.lua and WarbandMoney's
+-- features\expired-source.lua). TSM never sees this skip -- no auction was
+-- posted -- so without it the minimum-price guard would keep seeing "0
+-- expired" for an item it just refused to sell.
+function AuctionatorSaleItemMixin:RecordSkippedForBadPrice()
+  if self.itemInfo == nil or self.itemInfo.itemLink == nil then
+    return
+  end
+
+  if type(WarbandMoney) ~= "table" or type(WarbandMoney.RecordManualExpire) ~= "function" then
+    return
+  end
+
+  local quantity = self.Quantity:GetNumber()
+  if quantity == nil or quantity <= 0 then
+    return
+  end
+
+  pcall(WarbandMoney.RecordManualExpire, self.itemInfo.itemLink, quantity)
 end
 
 function AuctionatorSaleItemMixin:SkipItem()
