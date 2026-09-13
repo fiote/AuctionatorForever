@@ -1683,14 +1683,23 @@ function AuctionatorSaleItemMixin:SkipItem()
       Auctionator.Groups.TempHideItemLink(skippedItemLink)
     end
 
-    Auctionator.EventBus:Fire(
-      self, Auctionator.Selling.Events.BagItemRequest, self.nextItem
-    )
+    self:SelectNextItem()
 
     if skippedItemLink then
       Auctionator.Groups.CallbackRegistry:TriggerEvent("Customise.EditMade")
     end
   end
+end
+
+function AuctionatorSaleItemMixin:SelectNextItem()
+  if self.nextItem == nil then
+    return false
+  end
+
+  Auctionator.EventBus:Fire(
+    self, Auctionator.Selling.Events.BagItemRequest, self.nextItem
+  )
+  return true
 end
 
 function AuctionatorSaleItemMixin:PrevItem()
