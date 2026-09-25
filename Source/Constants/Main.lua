@@ -46,9 +46,9 @@ Auctionator.Constants = {
   RecentsListLimit = 30,
 
   Durations = {
-    Short = 2,
-    Medium = 8,
-    Long = 24,
+    Short = 12,
+    Medium = 24,
+    Long = 48,
   },
 
   AfterAHCut = 0.95,
