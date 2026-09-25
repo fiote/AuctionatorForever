@@ -103,18 +103,20 @@ end
 function Auctionator.Search.InitializeOldCategories()
   for _, classID in ipairs( Auctionator.Groups.Constants.ValidItemClassIDs ) do
     local key = C_Item.GetItemClassInfo( classID )
-    local subClasses = GenerateSubClasses( classID, key )
-    local category = {classID = classID}
+    if key then
+      local subClasses = GenerateSubClasses( classID, key )
+      local category = {classID = classID}
 
-    local categoryCategory = Auctionator.Search.OldCategory:new({
-      classID = classID,
-      name = name,
-      key = key,
-      category = {category},
-      subClasses = subClasses
-    })
+      local categoryCategory = Auctionator.Search.OldCategory:new({
+        classID = classID,
+        name = key,
+        key = key,
+        category = {category},
+        subClasses = subClasses
+      })
 
-    table.insert( OldCategories, categoryCategory )
+      table.insert( OldCategories, categoryCategory )
+    end
   end
 
   for _, category in ipairs( OldCategories ) do
