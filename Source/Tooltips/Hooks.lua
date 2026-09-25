@@ -68,7 +68,7 @@ if GameTooltip.SetRecipeReagentItem then -- Dragonflight onwards
     local recipeLevel
     if ProfessionsFrame and ProfessionsFrame.CraftingPage:IsVisible() then
       recipeLevel = ProfessionsFrame.CraftingPage.SchematicForm:GetCurrentRecipeLevel()
-    elseif ProfessionsFrame and ProfessionsFrame.OrdersPage:IsVisible() then
+    elseif ProfessionsFrame and ProfessionsFrame.OrdersPage and ProfessionsFrame.OrdersPage:IsVisible() then
       recipeLevel =  ProfessionsFrame.OrdersPage.OrderView.OrderDetails.SchematicForm:GetCurrentRecipeLevel()
     end
 
