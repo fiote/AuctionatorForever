@@ -16,7 +16,7 @@ function AuctionatorShoppingPriceCellTemplateMixin:Populate(rowData, index)
 
   local amount = rowData[self.columnName]
   if amount ~= nil then
-    self.text:SetText(Auctionator.Utilities.CreatePaddedMoneyString(amount, true, true, true))
+    self.text:SetText(Auctionator.Utilities.CreatePaddedMoneyString(amount, false, false, true))
   else
     self.text:SetText("")
   end

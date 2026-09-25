@@ -10,22 +10,10 @@ local POSTING_EVENTS = {
   "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
 }
 
--- Necessary because attempting to post an auction with copper value silently
--- fails
 local function NormalizePrice(price)
   local normalizedPrice = price
 
-  if Auctionator.Constants.IsRetail then
-    -- Round up
-    if normalizedPrice % 100 ~= 0 then
-      normalizedPrice = normalizedPrice + (100 - normalizedPrice % 100)
-    end
-
-    -- Need to have a price of at least one silver (retail) or one copper (cata)
-    if normalizedPrice < 100 then
-      normalizedPrice = 100
-    end
-  elseif normalizedPrice < 1 then
+  if normalizedPrice < 1 then
     normalizedPrice = 1
   end
 
