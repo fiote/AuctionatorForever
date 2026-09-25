@@ -101,6 +101,11 @@ end
 AuctionatorSaleItemMixin = {}
 
 function AuctionatorSaleItemMixin:OnLoad()
+  if Auctionator.Constants.IsForever then
+    self.Duration:ClearAllPoints()
+    self.Duration:SetPoint("TOPLEFT", self.MaxButton, "TOPRIGHT", 10, 10)
+  end
+
   if Auctionator.Config.Get(Auctionator.Config.Options.SHOW_SELLING_BID_PRICE) then
     self.BidPrice:Show()
   end

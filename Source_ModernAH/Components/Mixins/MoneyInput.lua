@@ -7,6 +7,23 @@ function AuctionatorConfigMoneyInputMixin:OnLoad()
 
   if not self.MoneyInput.hideCopper then
     self.MoneyInput:SetWidth(190)
+
+    if Auctionator.Constants.IsForever and self.equalDenominationWidths then
+      local denominationWidth = self.MoneyInput.SilverBox:GetWidth()
+      local spacing = 6
+
+      self.MoneyInput.GoldBox:ClearAllPoints()
+      self.MoneyInput.GoldBox:SetPoint("LEFT")
+      self.MoneyInput.GoldBox:SetWidth(denominationWidth)
+
+      self.MoneyInput.SilverBox:ClearAllPoints()
+      self.MoneyInput.SilverBox:SetPoint("LEFT", self.MoneyInput.GoldBox, "RIGHT", spacing, 0)
+
+      self.MoneyInput.CopperBox:ClearAllPoints()
+      self.MoneyInput.CopperBox:SetPoint("LEFT", self.MoneyInput.SilverBox, "RIGHT", spacing, 0)
+
+      self.MoneyInput:SetWidth(denominationWidth * 3 + spacing * 2)
+    end
   end
 
   self.MoneyInput.CopperBox:SetScript("OnEnter", function() self:OnEnter() end)

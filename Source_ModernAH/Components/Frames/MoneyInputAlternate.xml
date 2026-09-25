@@ -11,6 +11,9 @@
       </KeyValues>
     -->
     <Size y="7"/>
+    <KeyValues>
+      <KeyValue key="equalDenominationWidths" value="true" type="boolean"/>
+    </KeyValues>
     <Scripts>
       <OnLoad method="OnLoad"/>
     </Scripts>
