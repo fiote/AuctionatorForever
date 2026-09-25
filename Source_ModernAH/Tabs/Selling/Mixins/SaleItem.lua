@@ -1529,6 +1529,10 @@ function AuctionatorSaleItemMixin:PostAtAvgSalePrice()
 end
 
 function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
+  if InCombatLockdown() then
+    return
+  end
+
   if not confirmed then
     self.pendingPostBuyout = requestedBuyout
   end
