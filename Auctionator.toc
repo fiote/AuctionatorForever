@@ -1,4 +1,4 @@
-## Interface: 120001, 120000, 50503, 38000, 20505, 11508
+## Interface: 120001, 120000, 16001, 50503, 38000, 20505, 11508
 ## Title: Auctionator
 ## Version: @project-version@
 ## Author: plusmouse, Borjamacare
@@ -48,3 +48,4 @@ Data_Vanilla\Suffixes.lua [AllowLoadGameType vanilla, tbc, wrath]
 Source_LegacyAH\Manifest.xml [AllowLoadGameType vanilla, tbc, wrath]
 
 Source_TBC\Constants\Main.lua [AllowLoadGameType tbc, wrath]
+Source_Forever\Constants.lua [AllowLoadGameType camelot][ExcludeLoadGameType classic, standard]
