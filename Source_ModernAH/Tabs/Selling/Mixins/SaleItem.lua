@@ -326,11 +326,11 @@ function AuctionatorSaleItemMixin:GetDeposit(quantity)
   if duration == nil then
     local selectedDuration = self.Duration:GetValue() or Auctionator.Config.Get(Auctionator.Config.Options.AUCTION_DURATION)
 
-    if selectedDuration == 12 then
+    if selectedDuration == 2 then
       duration = 1
-    elseif selectedDuration == 24 then
+    elseif selectedDuration == 8 then
       duration = 2
-    elseif selectedDuration == 48 then
+    elseif selectedDuration == 24 then
       duration = 3
     end
   end
@@ -1027,9 +1027,9 @@ function AuctionatorSaleItemMixin:UpdateSkipButtonState()
 end
 
 local AUCTION_DURATIONS = {
-  [12] = 1,
-  [24] = 2,
-  [48] = 3,
+  [2] = 1,
+  [8] = 2,
+  [24] = 3,
 }
 
 function AuctionatorSaleItemMixin:GetDuration()

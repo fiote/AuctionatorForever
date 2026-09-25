@@ -23,20 +23,20 @@
         <Frames>
           <Frame inherits="AuctionatorConfigurationRadioButton">
             <KeyValues>
-              <KeyValue key="labelText" value="AUCTIONATOR_L_AUCTION_DURATION_12" type="global"/>
-              <KeyValue key="value" value="12" type="number"/>
+              <KeyValue key="labelText" value="Auctionator.Constants.Durations.Short" type="global"/>
+              <KeyValue key="value" value="2" type="number"/>
             </KeyValues>
           </Frame>
           <Frame inherits="AuctionatorConfigurationRadioButton">
             <KeyValues>
-              <KeyValue key="labelText" value="AUCTIONATOR_L_AUCTION_DURATION_24" type="global"/>
+              <KeyValue key="labelText" value="Auctionator.Constants.Durations.Medium" type="global"/>
+              <KeyValue key="value" value="8" type="number"/>
+            </KeyValues>
+          </Frame>
+          <Frame inherits="AuctionatorConfigurationRadioButton">
+            <KeyValues>
+              <KeyValue key="labelText" value="Auctionator.Constants.Durations.Long" type="global"/>
               <KeyValue key="value" value="24" type="number"/>
-            </KeyValues>
-          </Frame>
-          <Frame inherits="AuctionatorConfigurationRadioButton">
-            <KeyValues>
-              <KeyValue key="labelText" value="AUCTIONATOR_L_AUCTION_DURATION_48" type="global"/>
-              <KeyValue key="value" value="48" type="number"/>
             </KeyValues>
           </Frame>
         </Frames>
