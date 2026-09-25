@@ -10,10 +10,6 @@ local POSTING_EVENTS = {
   "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED",
 }
 
-local INTERFACE_VERSION = select(4, GetBuildInfo())
-local COMMODITY_POSTING_IS_PROTECTED = INTERFACE_VERSION >= 120000 or
-  (INTERFACE_VERSION >= 16000 and INTERFACE_VERSION < 20000)
-
 local function NormalizePrice(price)
   local normalizedPrice = price
 
@@ -1547,10 +1543,6 @@ function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
     self.pendingPostBuyout = nil
     Auctionator.Debug.Message("Trying to post when we can't. Returning")
     return
-  elseif self.itemInfo.isCommodity and COMMODITY_POSTING_IS_PROTECTED then
-    self.pendingPostBuyout = nil
-    Auctionator.Utilities.Message("Commodity posting is protected on this client. Use the Blizzard Sell tab to post this item.")
-    return
   elseif not confirmed and self:RequiresConfirmationState(postBuyout) then
     if self.SkipButton:IsEnabled() then
       StaticPopupDialogs[Auctionator.Constants.DialogNames.SellingConfirmPostSkip].text = self:GetConfirmationMessage(postBuyout)
@@ -1567,14 +1559,6 @@ function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
   local startingBid = self.BidPrice:GetAmount()
   local buyout = postBuyout
   local bidAmountReported = nil -- Only includes bid price when non-zero and for an item
-  self.pendingPostBuyout = nil
-
-  self.manualPostingPending = true
-  self.pendingPostNextItem = nil
-  if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) then
-    self.pendingPostNextItem = self.nextItem
-  end
-  self:UpdatePostButtonState()
 
   self.MultisellProgress:SetDetails(self.itemInfo.iconTexture, quantity)
 
@@ -1599,6 +1583,14 @@ function AuctionatorSaleItemMixin:PostItem(confirmed, requestedBuyout)
       AuctionHouseFrame.CommoditiesSellFrame:CachePendingPost(unpack(params))
     end
   end
+
+  self.pendingPostBuyout = nil
+  self.manualPostingPending = true
+  self.pendingPostNextItem = nil
+  if Auctionator.Config.Get(Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT) then
+    self.pendingPostNextItem = self.nextItem
+  end
+  self:UpdatePostButtonState()
 
   local postedInfo = {
     itemLink = self.itemInfo.itemLink,
