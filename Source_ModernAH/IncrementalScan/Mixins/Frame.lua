@@ -161,22 +161,41 @@ function AuctionatorIncrementalScanFrameMixin:NextStep()
   if self.doingFullScan and not Auctionator.AH.HasFullBrowseResults() then
     Auctionator.AH.RequestMoreBrowseResults()
   else
-    local count = Auctionator.Database:ProcessScan(self.info)
-    if Auctionator.GlobalDatabase ~= nil then
-      Auctionator.GlobalDatabase:ProcessScan(self.globalInfo or {})
-    end
     local rawScan = self.rawScan
+    local info = self.info
+    local globalInfo = self.globalInfo or {}
+    local doingFullScan = self.doingFullScan
 
-    self.info = {} --Already processed, so clear
+    self.info = {}
     self.globalInfo = {}
     self.rawScan = {}
+    self.doingFullScan = false
 
-    if self.doingFullScan then
-      Auctionator.Utilities.Message(AUCTIONATOR_L_FINISHED_PROCESSING:format(count))
-      self.doingFullScan = false
-
-      Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.ScanComplete, rawScan)
+    if doingFullScan then
+      Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.ScanProgress, 0.99)
     end
-    Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.PricesProcessed)
+
+    local pendingScans = Auctionator.GlobalDatabase ~= nil and 2 or 1
+    local count = 0
+    local function OnScanProcessed()
+      pendingScans = pendingScans - 1
+      if pendingScans > 0 then
+        return
+      end
+
+      if doingFullScan then
+        Auctionator.Utilities.Message(AUCTIONATOR_L_FINISHED_PROCESSING:format(count))
+        Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.ScanComplete, rawScan)
+      end
+      Auctionator.EventBus:Fire(self, Auctionator.IncrementalScan.Events.PricesProcessed)
+    end
+
+    Auctionator.Database:ProcessScan(info, function(processedCount)
+      count = processedCount
+      OnScanProcessed()
+    end)
+    if Auctionator.GlobalDatabase ~= nil then
+      Auctionator.GlobalDatabase:ProcessScan(globalInfo, OnScanProcessed)
+    end
   end
 end
