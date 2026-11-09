@@ -5,7 +5,10 @@ if not lib or lib.internalState then return end
 local MIN_TAB_WIDTH = 70
 local TAB_PADDING = 20
 local OFFSET_X = 3
-if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+-- Forever (build 1.x, 16000-19999) uses the modern AH tab template, so it needs
+-- the mainline spacing; -14 makes the tabs overlap there.
+local IS_FOREVER = (select(4, GetBuildInfo()) or 0) >= 16000 and (select(4, GetBuildInfo()) or 0) < 20000
+if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE and not IS_FOREVER then
   OFFSET_X = -14
 end
 
