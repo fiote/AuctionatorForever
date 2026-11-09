@@ -270,8 +270,11 @@ function AuctionatorSaleItemMixin:OnUpdate()
     return
   end
 
+  -- Only drop silver/copper when the total is large enough for them to be noise;
+  -- otherwise small totals (e.g. 4s 64c) would render as "0 gold".
+  local totalPrice = self.Quantity:GetNumber() * self.Price:GetAmount()
   self.TotalPrice:SetText(
-    Auctionator.Utilities.CreatePaddedMoneyString(self.Quantity:GetNumber() * self.Price:GetAmount(), true, true, true)
+    Auctionator.Utilities.CreatePaddedMoneyString(totalPrice, totalPrice >= 1000000, totalPrice >= 10000, true)
   )
 
   if self.Quantity:GetNumber() > self:GetPostLimit() then
@@ -285,11 +288,17 @@ function AuctionatorSaleItemMixin:OnUpdate()
   local expiredCount = GetExpiredSinceLastSale(self.itemInfo)
   local depositText = GetMoneyString(deposit, true)
 
+  local floorInfo = self:GetDepositFloorInfo(deposit)
+  if floorInfo then
+    depositText = depositText .. " |cffff8000(min)|r"
+  end
+
   if expiredCount > 0 then
     depositText = depositText .. " (" .. GetMoneyString(unitDeposit * expiredCount, true) .. ")"
   end
 
   self.DepositPrice:SetText(depositText)
+  self:UpdateDepositFloorHover(floorInfo)
   self:ValidateMinimumPrice()
   self:UpdatePostButtonState()
   self:UpdateSkipButtonState()
@@ -344,6 +353,87 @@ function AuctionatorSaleItemMixin:GetDeposit(quantity)
   end
 
   return NormalizePrice(deposit)
+end
+
+-- The server clamps deposits to a minimum (1s on Forever). Detect when the
+-- current deposit is being held up by that floor, by comparing it against the
+-- proportional per-unit rate taken from a large probe quantity (the API
+-- accepts quantities larger than what is in the bags). Cached per
+-- item/duration because this runs from OnUpdate.
+function AuctionatorSaleItemMixin:GetDepositFloorInfo(deposit)
+  if not self.itemInfo or not self.itemInfo.itemID then
+    return nil
+  end
+
+  local probeQuantity = 1000
+  local cacheKey = tostring(self.itemInfo.itemLink or self.itemInfo.itemID) .. ":" .. tostring(self.Duration:GetValue())
+  local cache = self.depositProbeCache
+  if not cache or cache.key ~= cacheKey then
+    local ok, probe = pcall(self.GetDeposit, self, probeQuantity)
+    local ok2, probe2 = pcall(self.GetDeposit, self, probeQuantity * 2)
+    local perUnit = 0
+    -- Only trust the probe when the API actually scales with quantity
+    -- (non-commodity item deposits may ignore it).
+    if ok and ok2 and probe and probe2 and probe > 1 and math.abs(probe2 - probe * 2) <= 2 then
+      perUnit = probe / probeQuantity
+    end
+    cache = { key = cacheKey, perUnit = perUnit }
+    self.depositProbeCache = cache
+  end
+
+  local perUnit = cache.perUnit
+  local quantity = self.Quantity:GetNumber()
+  if perUnit <= 0 or quantity <= 0 then
+    return nil
+  end
+
+  local proportional = perUnit * quantity
+  -- +1c tolerance: the server floors fractional copper
+  if deposit <= proportional + 1 then
+    return nil
+  end
+
+  return {
+    deposit = deposit,
+    proportional = math.floor(proportional),
+    breakEven = math.ceil(deposit / perUnit),
+    quantity = quantity,
+    owned = self.itemInfo.count,
+  }
+end
+
+function AuctionatorSaleItemMixin:UpdateDepositFloorHover(floorInfo)
+  if not self.DepositFloorHover then
+    local hover = CreateFrame("Frame", nil, self)
+    hover:SetAllPoints(self.DepositPrice)
+    hover:EnableMouse(true)
+    if hover.SetMouseClickEnabled then
+      hover:SetMouseClickEnabled(false)
+    end
+    hover:SetScript("OnEnter", function(frame)
+      local info = frame.floorInfo
+      if not info then
+        return
+      end
+      GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+      GameTooltip:SetText("Minimum deposit", 1, 0.5, 0)
+      GameTooltip:AddLine("The server is charging its minimum deposit for this stack.", 1, 1, 1, true)
+      GameTooltip:AddDoubleLine("Paying:", GetMoneyString(info.deposit, true), 1, 0.82, 0, 1, 1, 1)
+      GameTooltip:AddDoubleLine("Proportional cost:", (info.proportional >= 1 and GetMoneyString(info.proportional, true) or "<1c"), 1, 0.82, 0, 1, 1, 1)
+      GameTooltip:AddDoubleLine("Stack for no waste:", info.breakEven .. "+", 1, 0.82, 0, 1, 1, 1)
+      if info.owned and info.owned < info.breakEven then
+        GameTooltip:AddLine("You only have " .. info.owned .. ". Consider holding until you have a bigger stack.", 0.8, 0.8, 0.8, true)
+      end
+      GameTooltip:Show()
+    end)
+    hover:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
+    self.DepositFloorHover = hover
+  end
+
+  self.DepositFloorHover.floorInfo = floorInfo
+  self.DepositFloorHover:SetShown(floorInfo ~= nil)
 end
 
 function AuctionatorSaleItemMixin:ReceiveEvent(event, ...)
@@ -548,6 +638,11 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
   self.AvgSaleButton:SetText("Avg Sale")
 
   self.DepositPrice:SetText(GetMoneyString(100, true))
+  self.depositProbeCache = nil
+  if self.DepositFloorHover then
+    self.DepositFloorHover.floorInfo = nil
+    self.DepositFloorHover:Hide()
+  end
   self.TotalPrice:SetText(Auctionator.Utilities.CreatePaddedMoneyString(100, true, true, true))
 end
 
