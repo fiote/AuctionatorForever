@@ -1,5 +1,10 @@
 local GroupType = Auctionator.Groups.Constants.GroupType
 
+local function GroupKey(details, isCustom)
+  return details.daylightKey and "daylight_" .. details.daylightKey or
+    (isCustom and details.name or "k_" .. details.name)
+end
+
 AuctionatorGroupsViewMixin = {}
 function AuctionatorGroupsViewMixin:OnLoad()
   local view = CreateScrollBoxLinearView()
@@ -166,7 +171,7 @@ function AuctionatorGroupsViewMixin:UpdateGroupHeights()
         b:Hide()
       end
     end
-    self.collapsing[index] = group.collapsed
+    self.collapsing[GroupKey(self.groupDetails[index], group.isCustom)] = group.collapsed
   end
 
   self.ScrollBox.ItemListingFrame:SetHeight(offset)
@@ -188,9 +193,37 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
   self.groups = {}
   local iconSize = Auctionator.Config.Get(Auctionator.Config.Options.SELLING_ICON_SIZE)
 
-  -- Used to ensure no key naming clashes between custom groups and raw groups
-  local function GetKeyName(groupName, isCustom)
-    return (isCustom and groupName) or "k_" .. groupName
+  self.groupDetails = CopyTable({AUCTIONATOR_SELLING_GROUPS.CustomGroups[1]})
+  local daylightItems = {}
+  local module = self.applyVisibility and DaylightUI and DaylightUI.GetModule and DaylightUI:GetModule("Bags")
+  local ns = module and module.enabled and module.ns
+  local categories = ns and ns.Categories
+  if categories and ns.Items and ns.Items.InfoAt and categories.Facts and categories.Assign and categories.Order and categories.Get then
+    local used = {}
+    for _, item in ipairs(self.rawItems) do
+      local location = item.locations and item.locations[1]
+      if item.auctionable and not self.hiddenItems[item.sortKey] and not self.tempHiddenItems[item.sortKey] and
+         (item.quality ~= Enum.ItemQuality.Poor or Auctionator.Utilities.IsEquipment(item.classID)) and
+         location and location:IsBagAndSlot() then
+        local bag, slot = location:GetBagAndSlot()
+        local info = ns.Items.InfoAt(bag, slot)
+        if info and info.itemID == item.itemID then
+          local key = categories.Assign(categories.Facts(bag, slot, info), "bags", bag)
+          if key and categories.Get(key) then
+            daylightItems[item.sortKey] = key
+            used[key] = true
+          end
+        end
+      end
+    end
+    for _, key in ipairs(categories.Order()) do
+      if used[key] then
+        table.insert(self.groupDetails, {name = categories.Get(key).name, daylightKey = key})
+      end
+    end
+  end
+  for _, details in ipairs(Auctionator.Groups.Constants.DefaultGroups) do
+    table.insert(self.groupDetails, details)
   end
 
   local groups = {}
@@ -201,7 +234,7 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
     group:Reset()
     local isCustom = index == 1 -- Only the first group is custom FAVOURITES now
     group:SetName(groupDetails.name, isCustom)
-    if self.applyVisibility and (self.collapsing[index] or (self.originalOpen and Auctionator.Config.Get(Auctionator.Config.Options.SELLING_BAG_COLLAPSED))) then
+    if self.applyVisibility and (self.collapsing[GroupKey(groupDetails, isCustom)] or (self.originalOpen and Auctionator.Config.Get(Auctionator.Config.Options.SELLING_BAG_COLLAPSED))) then
       group:ToggleOpen(true)
     end
     table.insert(groups, group)
@@ -230,7 +263,7 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
       if self.applyVisibility and not Auctionator.Config.Get(Auctionator.Config.Options.SELLING_MISSING_FAVOURITES) then
         infos = tFilter(infos, function(a) return #a.locations > 0 end, true)
       end
-      local keyName = GetKeyName(groupDetails.name, isCustom)
+      local keyName = GroupKey(groupDetails, isCustom)
       for _, info in ipairs(infos) do
         if not self.tempHiddenItems[info.sortKey] then
           local button = self.buttonPool:Acquire()
@@ -248,20 +281,22 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
 
   self.groups = groups
 
-  local classIDMap = {}
+  local classIDMap, daylightMap = {}, {}
   for index, s in ipairs(self.groupDetails) do
     if s.type == GroupType.ClassID then
       classIDMap[s.classID] = index
+    elseif s.daylightKey then
+      daylightMap[s.daylightKey] = index
     end
   end
 
   for _, item in ipairs(self.rawItems) do
     if item.auctionable and not self.hiddenItems[item.sortKey] and not self.tempHiddenItems[item.sortKey] and (item.quality ~= Enum.ItemQuality.Poor or Auctionator.Utilities.IsEquipment(item.classID))  then
-      local index = classIDMap[item.classID]
+      local index = daylightMap[daylightItems[item.sortKey]] or classIDMap[item.classID]
       if index ~= nil then
         local button = self.buttonPool:Acquire()
         button:SetClickEvent(self.clickEventName)
-        item.selected = self.selected and self.selected.keyName == GetKeyName(self.groupDetails[index].name, false) and item.sortKey == self.selected.sortKey
+        item.selected = self.selected and self.selected.keyName == GroupKey(self.groupDetails[index], false) and item.sortKey == self.selected.sortKey
         item.isCustom = false
         button:SetItemInfo(item)
         button:SetSize(iconSize, iconSize)
@@ -275,7 +310,7 @@ function AuctionatorGroupsViewMixin:UpdateFromExisting()
   self.itemMap = {}
   for index, group in ipairs(groups) do
     local groupInfo = self.groupDetails[index]
-    local keyName = GetKeyName(groupInfo.name, group.isCustom)
+    local keyName = GroupKey(groupInfo, group.isCustom)
     self.itemMap[keyName] = {}
     for _, button in ipairs(group.buttons) do
       button.prevItem = nil
