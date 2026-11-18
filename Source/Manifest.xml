@@ -1,6 +1,7 @@
 <!-- Source directory manifest -->
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
   <Script file="Objects.lua" />
+  <Script file="Font.lua" />
   <Script file="Locales\Main.lua" />
   <Include file="Constants\Manifest.xml" />
 

@@ -30,6 +30,8 @@ function AuctionatorTabContainerMixin:OnLoad()
     local buttonFrameName = "AuctionatorTabs_" .. details.name
     LibAHTab:CreateTab(buttonFrameName, frameRef, details.textLabel, details.tabHeader)
     _G[buttonFrameName] = LibAHTab:GetButton(buttonFrameName)
+    Auctionator.RegisterFontRoot(frameRef)
+    Auctionator.RegisterFontRoot(_G[buttonFrameName])
     table.insert(AuctionatorAHTabsContainer.Tabs, _G[buttonFrameName])
 
     -- Apply small tabs if enabled

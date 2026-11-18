@@ -2,6 +2,7 @@ local counter = 0
 local function GenerateDialog()
   counter = counter + 1
   local dialog = CreateFrame("Frame", "AuctionatorDialog" .. counter, UIParent)
+  Auctionator.RegisterFontRoot(dialog)
   dialog:SetToplevel(true)
   table.insert(UISpecialFrames, "AuctionatorDialog" .. counter)
   dialog:SetPoint("TOP", 0, -135)

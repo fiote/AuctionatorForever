@@ -16,6 +16,8 @@ function AuctionatorTabMixin:Initialize(name, tabTemplate, tabHeader, displayMod
     tabTemplate
   )
   self.frameRef:Hide()
+  Auctionator.RegisterFontRoot(self.wrapperFrame)
+  Auctionator.RegisterFontRoot(self)
 
   local index = AuctionFrame.numTabs + 1
   self:SetID(index)
