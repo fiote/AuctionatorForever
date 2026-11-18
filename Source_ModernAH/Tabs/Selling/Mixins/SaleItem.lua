@@ -230,12 +230,12 @@ function AuctionatorSaleItemMixin:UpdatePostAndSkipButtonLayout()
     self.SkipButton:SetPoint("TOPLEFT", self.Duration, "BOTTOMLEFT", 20, 0)
     self.PostButton:SetPoint("TOPLEFT", self.SkipButton, "TOPRIGHT", 0, 0)
     self.PrevButton:SetPoint("TOPRIGHT", self.SkipButton, "TOPLEFT", 0, 0)
-    self.Deposit:SetPoint("TOPLEFT", self.PostButton, "TOPRIGHT", 15, 50)
+    self.Deposit:SetPoint("TOPLEFT", self.PostButton, "TOPRIGHT", 15, 79)
   else
     self.PostButton:SetPoint("TOPLEFT", self.Duration, "BOTTOMLEFT", 20, 0)
     self.SkipButton:SetPoint("TOPLEFT", self.PostButton, "TOPRIGHT", 0, 0)
     self.PrevButton:SetPoint("TOPRIGHT", self.PostButton, "TOPLEFT", 0, 0)
-    self.Deposit:SetPoint("TOPLEFT", self.SkipButton, "TOPRIGHT", 15, 50)
+    self.Deposit:SetPoint("TOPLEFT", self.SkipButton, "TOPRIGHT", 15, 79)
   end
 end
 
@@ -276,6 +276,8 @@ function AuctionatorSaleItemMixin:OnUpdate()
   self.TotalPrice:SetText(
     Auctionator.Utilities.CreatePaddedMoneyString(totalPrice, totalPrice >= 1000000, totalPrice >= 10000, true)
   )
+  local vendorPrice = select(Auctionator.Constants.ITEM_INFO.SELL_PRICE, C_Item.GetItemInfo(self.itemInfo.itemLink))
+  self.VendorPrice:SetText(vendorPrice and GetMoneyString(vendorPrice * self.Quantity:GetNumber(), true) or "-")
 
   if self.Quantity:GetNumber() > self:GetPostLimit() then
     self:SetMax()
@@ -644,6 +646,7 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
     self.DepositFloorHover:Hide()
   end
   self.TotalPrice:SetText(Auctionator.Utilities.CreatePaddedMoneyString(100, true, true, true))
+  self.VendorPrice:SetText("-")
 end
 
 local DURATIONS_TO_TIME = {

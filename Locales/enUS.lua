@@ -313,6 +313,7 @@ AUCTIONATOR_LOCALES.enUS = function()
   L["PREVIOUS"] = "Previous"
   L["DEPOSIT"] = "Deposit:"
   L["TOTAL_PRICE"] = "Total Price:"
+  L["VENDOR_PRICE"] = "Vendor Price:"
   L["TOTAL_PRICE_PLAIN"] = "Total Price"
   L["CONFIRM_POST_LOW_PRICE"] = "The price of %s looks a bit low. Are you sure you want to post at that price?"
   L["CONFIRM_POST_BELOW_VENDOR"] = "You can make more gold selling this to a vendor. Are you sure you want to post at that price?"

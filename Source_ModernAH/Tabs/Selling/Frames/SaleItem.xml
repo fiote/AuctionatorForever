@@ -154,7 +154,7 @@
       <Layer level="BACKGROUND">
         <FontString inherits="GameFontNormal" parentKey="Deposit" Text="AUCTIONATOR_L_DEPOSIT">
           <Anchors>
-            <Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.SkipButton" x="15" y="50" />
+            <Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.SkipButton" x="15" y="79" />
           </Anchors>
         </FontString>
       </Layer>
@@ -182,6 +182,23 @@
           <Size y="25" />
           <Anchors>
             <Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" relativeKey="$parent.Total"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+
+      <Layer level="BACKGROUND">
+        <FontString inherits="GameFontNormal" parentKey="Vendor" Text="AUCTIONATOR_L_VENDOR_PRICE">
+          <Anchors>
+            <Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" relativeKey="$parent.TotalPrice"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+
+      <Layer level="BACKGROUND">
+        <FontString inherits="GameFontHighlight" parentKey="VendorPrice">
+          <Size y="25" />
+          <Anchors>
+            <Anchor point="TOPLEFT" relativePoint="BOTTOMLEFT" relativeKey="$parent.Vendor"/>
           </Anchors>
         </FontString>
       </Layer>
