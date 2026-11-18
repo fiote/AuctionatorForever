@@ -101,7 +101,7 @@ Auctionator.Config.Defaults = {
   [Auctionator.Config.Options.SELLING_ICON_SIZE] = 42,
   [Auctionator.Config.Options.SELLING_IGNORED_KEYS] = {},
   [Auctionator.Config.Options.SELLING_FAVOURITE_KEYS] = {},
-  [Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT] = false,
+  [Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT] = true,
   [Auctionator.Config.Options.SELLING_MISSING_FAVOURITES] = true,
   [Auctionator.Config.Options.SELLING_FAVOURITES_SORT_OWNED] = false,
   [Auctionator.Config.Options.SELLING_SPLIT_BY_STAT_SIGNATURE] = true,
@@ -208,8 +208,15 @@ function Auctionator.Config.InitializeData()
         AUCTIONATOR_CONFIG[option] = value
       end
     end
-    Auctionator.Config.InitializeCharacterConfig()
   end
+
+  for _, config in ipairs({AUCTIONATOR_CONFIG, AUCTIONATOR_CHARACTER_CONFIG}) do
+    if not config.selling_auto_select_next_initialized then
+      config[Auctionator.Config.Options.SELLING_AUTO_SELECT_NEXT] = true
+      config.selling_auto_select_next_initialized = true
+    end
+  end
+  Auctionator.Config.InitializeCharacterConfig()
 end
 
 function Auctionator.Config.InitializeCharacterConfig()
