@@ -123,6 +123,11 @@ function AuctionatorBagUseMixin:BagItemClicked(button, mouseButton)
         else
           rootDescription:CreateButton(AUCTIONATOR_L_UNHIDE, function() self:UnhideItem(button) end)
         end
+        if self.View.tempHiddenItems[button.itemInfo.sortKey] then
+          rootDescription:CreateButton(AUCTIONATOR_L_UNHIDE_TEMP, function() self:TempUnhideItem(button) end)
+        else
+          rootDescription:CreateButton(AUCTIONATOR_L_HIDE_TEMP, function() self:TempHideItem(button) end)
+        end
         if next(self.View.hiddenItems) == nil then
           rootDescription:CreateTitle(GRAY_FONT_COLOR:WrapTextInColorCode(AUCTIONATOR_L_UNHIDE_ALL))
         else
@@ -170,6 +175,22 @@ function AuctionatorBagUseMixin:UnhideItem(button)
     Auctionator.Groups.UnhideItemLink(hiddenLink)
     Auctionator.Groups.CallbackRegistry:TriggerEvent("Customise.EditMade")
   end
+end
+
+function AuctionatorBagUseMixin:TempHideItem(button)
+  Auctionator.Groups.TempHideItemLink(button.itemInfo.itemLink)
+  Auctionator.Groups.CallbackRegistry:TriggerEvent("Customise.EditMade")
+end
+
+function AuctionatorBagUseMixin:TempUnhideItem(button)
+  local sortKey = button.itemInfo.sortKey
+  for _, link in ipairs(Auctionator.Groups.GetTempHiddenItemLinks()) do
+    local info = AuctionatorBagCacheFrame:GetByLinkInstant(link, true)
+    if info and info.sortKey == sortKey then
+      Auctionator.Groups.TempUnhideItemLink(link)
+    end
+  end
+  Auctionator.Groups.CallbackRegistry:TriggerEvent("Customise.EditMade")
 end
 
 function AuctionatorBagUseMixin:UnhideAll()

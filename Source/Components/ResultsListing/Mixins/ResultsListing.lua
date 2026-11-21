@@ -22,6 +22,12 @@ function AuctionatorResultsListingMixin:Init(dataProvider)
   self.tableBuilder = AuctionatorRetailImportCreateTableBuilder()
   -- Set the frame that will be used for header columns for this tableBuilder
   self.tableBuilder:SetHeaderContainer(self.HeaderContainer)
+  self.HeaderContainer:HookScript("OnSizeChanged", function(_, width)
+    if self.isInitialized and width > 0 then
+      self:UpdateDimensionsForHiding()
+      self:ApplyHiding()
+    end
+  end)
 
   self:InitializeTable()
   self:InitializeDataProvider()
@@ -189,6 +195,12 @@ function AuctionatorResultsListingMixin:ApplyHiding()
 end
 
 function AuctionatorResultsListingMixin:UpdateDimensionsForHiding()
+  local width = self.HeaderContainer:GetWidth()
+  if not width or width <= 0 then
+    return
+  end
+  self.tableBuilder:SetTableWidth(width)
+
   if not self.dataProvider:GetColumnHideStates() then
     self.tableBuilder:Arrange()
     return

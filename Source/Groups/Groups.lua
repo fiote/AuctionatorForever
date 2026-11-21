@@ -54,6 +54,12 @@ function Auctionator.Groups.TempHideItemLink(itemLink)
   AUCTIONATOR_SELLING_GROUPS.TempHiddenItems[itemLink] = time()
 end
 
+function Auctionator.Groups.TempUnhideItemLink(itemLink)
+  if AUCTIONATOR_SELLING_GROUPS.TempHiddenItems then
+    AUCTIONATOR_SELLING_GROUPS.TempHiddenItems[itemLink] = nil
+  end
+end
+
 function Auctionator.Groups.UnhideItemLink(itemLink)
   local index = tIndexOf(AUCTIONATOR_SELLING_GROUPS.HiddenItems, itemLink)
   if index ~= nil then
