@@ -52,7 +52,7 @@ local SHOPPING_LIST_TABLE_LAYOUT = {
     headerParameters = { "stat" },
     headerText = AUCTIONATOR_L_RESULTS_STAT_COLUMN,
     cellTemplate = "AuctionatorStringCellTemplate",
-    cellParameters = { "stat" },
+    cellParameters = { "statDisplay" },
     width = 105,
   }
 }
@@ -85,6 +85,7 @@ end
 function AuctionatorShoppingTabDataProviderMixin:ReceiveEvent(eventName, eventData, ...)
   if eventName == Auctionator.Shopping.Tab.Events.SearchStart then
     local category = ...
+    self.showFoodStatValue = category == "Foods"
     self.groupByStat = category == "Foods" or category == "Elixirs" or category == "Potions" or category == "Burst"
     if self.groupByStat and not self.presetSort.key then
       self:UseDefaultGroupedSort()
@@ -100,6 +101,13 @@ function AuctionatorShoppingTabDataProviderMixin:ReceiveEvent(eventName, eventDa
   end
 end
 
+local function FormatStat(stat, bonus)
+  if stat ~= "" and bonus ~= nil then
+    return ("%s %g"):format(stat, bonus)
+  end
+  return stat
+end
+
 function AuctionatorShoppingTabDataProviderMixin:PrettifyData(entries)
   for _, entry in ipairs(entries) do
     if entry.containsOwnerItem then
@@ -112,6 +120,7 @@ function AuctionatorShoppingTabDataProviderMixin:PrettifyData(entries)
     -- Search completion sends the same entries as the incremental updates.
     entry.value = entry.value or 0
     entry.stat = entry.stat or ""
+    entry.statDisplay = FormatStat(entry.stat, self.showFoodStatValue and entry.foodStatValue or nil)
     if not self.groupByStat then
       entry.startsStatGroup = nil
     end
@@ -130,16 +139,18 @@ function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyIn
   end
 
   local itemID = entry.itemKey.itemID
-  local function ApplyDetails(value, stat)
+  local function ApplyDetails(value, stat, foodStatValue)
+    local statDisplay = FormatStat(stat, self.showFoodStatValue and foodStatValue or nil)
     local sortKey = self.presetSort.key
     local needsSort = (sortKey == "value" and entry.value ~= value)
       or (sortKey == "stat" and entry.stat ~= stat)
       or (self.groupByStat and (entry.stat ~= stat or (sortKey == "stat" and entry.value ~= value)))
-    if entry.value == value and entry.stat == stat then
+    if entry.value == value and entry.stat == stat and entry.statDisplay == statDisplay then
       return
     end
     entry.value = value
     entry.stat = stat
+    entry.statDisplay = statDisplay
     self:SetDirty()
     if needsSort and not self.detailsSortQueued then
       self.detailsSortQueued = true
@@ -153,10 +164,10 @@ function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyIn
     end
   end
 
-  local value, foodStat = getFoodOrDrinkValue(itemID)
+  local value, foodStat, foodStatValue = getFoodOrDrinkValue(itemID)
   local stat, effectValue = getPotionOrElixirStat(itemID)
   if value ~= nil and stat ~= nil then
-    ApplyDetails(effectValue or value, foodStat or stat)
+    ApplyDetails(effectValue or value, foodStat or stat, foodStatValue)
   else
     local key = self:UniqueKey(entry)
     Item:CreateFromItemID(itemID):ContinueOnItemLoad(function()
@@ -172,8 +183,8 @@ function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyIn
           end
         end)
       else
-        local loadedFoodValue, loadedFoodStat = getFoodOrDrinkValue(itemID)
-        ApplyDetails(loadedEffectValue or loadedFoodValue or 0, loadedFoodStat or loadedStat or "")
+        local loadedFoodValue, loadedFoodStat, loadedFoodStatValue = getFoodOrDrinkValue(itemID)
+        ApplyDetails(loadedEffectValue or loadedFoodValue or 0, loadedFoodStat or loadedStat or "", loadedFoodStatValue)
       end
     end)
   end

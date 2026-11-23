@@ -13,7 +13,7 @@ function AuctionatorTabContainerMixin:OnLoad()
     local auctionHouse = AuctionHouseFrame
     auctionHouse.SellTab:Hide()
     auctionHouse.AuctionsTab:ClearAllPoints()
-    auctionHouse.AuctionsTab:SetPoint("LEFT", auctionHouse.BuyTab, "RIGHT", -15, 0)
+    auctionHouse.AuctionsTab:SetPoint("LEFT", auctionHouse.BuyTab, "RIGHT", 3, 0)
   end
 
   -- Tabs are sorted to avoid inconsistent ordering based on the addon loading

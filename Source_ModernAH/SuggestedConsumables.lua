@@ -33,6 +33,12 @@ local statPatterns = {
   { "Health", "maximum health", "max health", "health%s+by" },
   { "Mana", "maximum mana", "max mana", "mana%s+by" },
   { "Attack Power", "attack power" },
+  { "Arcane Damage", "arcane damage", "arcane spell damage", "damage done by arcane spells" },
+  { "Fire Damage", "fire damage", "fire spell damage", "damage done by fire spells" },
+  { "Frost Damage", "frost damage", "frost spell damage", "damage done by frost spells" },
+  { "Holy Damage", "holy damage", "holy spell damage", "damage done by holy spells" },
+  { "Nature Damage", "nature damage", "nature spell damage", "damage done by nature spells" },
+  { "Shadow Damage", "shadow damage", "shadow spell damage", "damage done by shadow spells" },
   { "Spell Power", "spell power", "spell damage", "damage done by spells" },
   { "Healing", "healing done by spells and effects", "healing done by spells", "spell healing", "healing power", "bonus healing" },
   { "Damage", "physical damage", "weapon damage", "damage" },
@@ -70,7 +76,7 @@ local ParseConsumableEffect
 local function FoodOrDrink(itemID)
   local cached = foodAndDrinkDetails[itemID]
   if cached then
-    return cached.category, cached.value, cached.stat
+    return cached.category, cached.value, cached.stat, cached.statValue
   end
 
   -- The client uses one subclass for both foods and drinks.
@@ -80,7 +86,7 @@ local function FoodOrDrink(itemID)
   end
 
   local restoresMana, restoresHealth, drink = false, false, false
-  local health, mana, stat
+  local health, mana, stat, statValue
   for _, line in ipairs(tooltip.lines) do
     local text = TooltipLineText(line):lower():gsub("%s+", " ")
     if text:match("^%s*use:") then
@@ -96,7 +102,7 @@ local function FoodOrDrink(itemID)
 
       local buff = text:match("well fed%s+(.+)") or text:match("(%f[%a]gains?%s+%d.+)")
       if buff and not stat then
-        stat = ParseConsumableEffect(buff)
+        stat, statValue = ParseConsumableEffect(buff)
       end
     end
   end
@@ -106,10 +112,10 @@ local function FoodOrDrink(itemID)
   if drink or (restoresMana and not restoresHealth) then
     category = "Drinks"
     value = mana or 0
-    stat = nil
+    stat, statValue = nil, nil
   end
-  foodAndDrinkDetails[itemID] = { category = category, value = value, stat = stat }
-  return category, value, stat
+  foodAndDrinkDetails[itemID] = { category = category, value = value, stat = stat, statValue = statValue }
+  return category, value, stat, statValue
 end
 
 function Auctionator.Shopping.GetFoodOrDrinkValue(itemID)
@@ -121,8 +127,8 @@ function Auctionator.Shopping.GetFoodOrDrinkValue(itemID)
     return 0
   end
 
-  local _, value, stat = FoodOrDrink(itemID)
-  return value, stat
+  local _, value, stat, statValue = FoodOrDrink(itemID)
+  return value, stat, statValue
 end
 
 ParseConsumableEffect = function(text)
@@ -334,7 +340,7 @@ function Auctionator.Shopping.GetSuggestedStats(category)
 end
 
 local function GetSuggestedPotionOrElixirDetails(scan, item)
-  if item.stat then
+  if item.stat and (item.damageSchoolParsed or (item.stat ~= "Damage" and item.stat ~= "Spell Power")) then
     return item.stat, item.value
   end
 
@@ -351,6 +357,7 @@ local function GetSuggestedPotionOrElixirDetails(scan, item)
   local stat, value, spellID, category = Auctionator.Shopping.GetPotionOrElixirStat(itemID)
   if stat and stat ~= "" then
     item.stat, item.value = stat, value
+    item.damageSchoolParsed = true
     item.category = category or item.category
     return stat, value
   end
@@ -505,10 +512,10 @@ local function GetSuggestionItem(itemID, subclass)
     return
   end
 
-  local category, value, stat = categories[subclass], nil, nil
+  local category, value, stat, statValue = categories[subclass], nil, nil, nil
   local requiredFirstAid = 0
   if subclass == foodAndDrink then
-    category, value, stat = FoodOrDrink(itemID)
+    category, value, stat, statValue = FoodOrDrink(itemID)
     if category == "Foods" then
       stat = stat or ""
     end
@@ -524,6 +531,7 @@ local function GetSuggestionItem(itemID, subclass)
       itemID = itemID,
       value = value,
       stat = stat,
+      statValue = statValue,
       requiredLevel = requiredLevel,
       requiredFirstAid = requiredFirstAid,
       term = Auctionator.Search.ReconstituteAdvancedSearch({
@@ -569,6 +577,7 @@ function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callb
       if candidate and terms[candidate.term] and (row.totalQuantity or 0) > 0 then
         row.searchTerm = candidate.term
         row.stat = candidate.stat or ""
+        row.foodStatValue = candidate.statValue
         row.value = candidate.value or 0
         table.insert(results, row)
       end
@@ -598,6 +607,7 @@ function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callb
           if candidate then
             if stat and stat ~= "" then
               candidate.stat, candidate.value = stat, value
+              candidate.damageSchoolParsed = true
               candidate.category = effectCategory or candidate.category
             end
             if candidate.category == category then
