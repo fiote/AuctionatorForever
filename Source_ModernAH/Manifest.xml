@@ -7,6 +7,7 @@
   <Include file="Constants\Manifest.xml" />
   <Include file="IncrementalScan\Manifest.xml"/>
   <Include file="FullScan\Manifest.xml"/>
+  <Script file="SuggestedConsumables.lua"/>
   <Include file="API\Manifest.xml"/>
   <Include file="Selling\Manifest.xml"/>
   <Script file="Buying\Events.lua"/>

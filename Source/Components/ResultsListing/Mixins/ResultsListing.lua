@@ -9,9 +9,22 @@ function AuctionatorResultsListingMixin:Init(dataProvider)
 
   local view = CreateScrollBoxListLinearView()
   view:SetElementExtent(20)
-  view:SetElementInitializer(dataProvider:GetRowTemplate(), function(frame, index)
+  local function PopulateRow(frame, index)
     frame:Populate(self.dataProvider:GetEntryAt(index), index)
-  end)
+  end
+  if dataProvider.GetDisplayIndexProvider then
+    view:SetElementFactory(function(factory, element)
+      if type(element) == "number" then
+        factory(dataProvider:GetRowTemplate(), PopulateRow)
+      else
+        factory("AuctionatorResultsGroupHeaderTemplate", function(frame, group)
+          frame.Label:SetText(group.label)
+        end)
+      end
+    end)
+  else
+    view:SetElementInitializer(dataProvider:GetRowTemplate(), PopulateRow)
+  end
 
   ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollArea.ScrollBox, self.ScrollArea.ScrollBar, view)
 
@@ -84,7 +97,21 @@ function AuctionatorResultsListingMixin:InitializeTable()
     return self.dataProvider:GetEntryAt(index)
   end)
 
-  ScrollUtil.RegisterTableBuilder(self.ScrollArea.ScrollBox, self.tableBuilder, function(a) return a end)
+  local scrollBox = self.ScrollArea.ScrollBox
+  if self.dataProvider.GetDisplayIndexProvider then
+    scrollBox:RegisterCallback(ScrollBoxListMixin.Event.OnInitializedFrame, function(_, frame, index)
+      if type(index) == "number" then
+        self.tableBuilder:AddRow(frame, index)
+      end
+    end, self)
+    scrollBox:RegisterCallback(ScrollBoxListMixin.Event.OnReleasedFrame, function(_, frame, index)
+      if type(index) == "number" then
+        self.tableBuilder:RemoveRow(frame, index)
+      end
+    end, self)
+  else
+    ScrollUtil.RegisterTableBuilder(scrollBox, self.tableBuilder, function(index) return index end)
+  end
 
   for _, columnEntry in ipairs(self.columnSpecification) do
     local column = self.tableBuilder:AddColumn()
@@ -127,7 +154,9 @@ function AuctionatorResultsListingMixin:UpdateTable()
     return
   end
 
-  local tmpDataProvider = CreateIndexRangeDataProvider(self.dataProvider:GetCount())
+  local dataProvider = self.dataProvider
+  local tmpDataProvider = (dataProvider.GetDisplayIndexProvider and dataProvider:GetDisplayIndexProvider())
+    or CreateIndexRangeDataProvider(dataProvider:GetCount())
 
   local shouldPreserveScroll = self.savedScrollPosition ~= nil
 

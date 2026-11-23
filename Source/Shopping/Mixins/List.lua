@@ -23,8 +23,23 @@ function AuctionatorShoppingListMixin:IsTemporary()
   return self.data.isTemporary
 end
 
+function AuctionatorShoppingListMixin:IsSuggested()
+  return self.data.suggestedCategory ~= nil
+end
+
+function AuctionatorShoppingListMixin:GetSuggestedCategory()
+  return self.data.suggestedCategory
+end
+
+function AuctionatorShoppingListMixin:SearchesWithoutExpanding()
+  local category = self:GetSuggestedCategory()
+  return category == "Foods" or category == "Drinks" or category == "Potions"
+    or category == "Elixirs" or category == "Burst"
+end
+
 function AuctionatorShoppingListMixin:MakePermanent()
   self.data.isTemporary = false
+  self.data.suggestedCategory = nil
 
   self.manager:FireMetaChangeEvent(self:GetName())
 end

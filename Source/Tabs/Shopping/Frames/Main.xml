@@ -121,7 +121,7 @@
           <Anchor point="BOTTOM" y="35"/>
           <Anchor point="LEFT"/>
         </Anchors>
-        <Size x="280"/>
+        <Size x="224"/>
         <Layers>
           <Layer level="OVERLAY">
             <Texture parentKey="LoadingSpinner" atlas="auctionhouse-ui-loadingspinner" hidden="true">
@@ -154,11 +154,11 @@
           <Anchor point="BOTTOM" y="10"/>
           <Anchor point="LEFT"/>
         </Anchors>
-        <Size x="280"/>
+        <Size x="224"/>
       </Frame>
       <Button parentKey="NewListButton" inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_NEW_LIST">
         <Anchors>
-          <Anchor point="BOTTOMLEFT" y="10" x="5"/>
+          <Anchor point="BOTTOMLEFT" y="10" x="2"/>
         </Anchors>
       </Button>
       <Button parentKey="ExportButton" inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_EXPORT">
@@ -180,7 +180,7 @@
           <OnLoad method="OnLoad"/>
         </Scripts>
         <Anchors>
-          <Anchor point="BOTTOMLEFT" relativeKey="$parent.ListsContainer" relativePoint="TOPLEFT" x="20"/>
+          <Anchor point="BOTTOMLEFT" relativeKey="$parent.ListsContainer" relativePoint="TOPLEFT" x="6"/>
         </Anchors>
         <Frames>
           <Button inherits="AuctionatorShoppingMiniTabButtonTemplate" text="AUCTIONATOR_L_SHOPPING_LISTS" id="1" parentKey="ListsTab">
@@ -232,6 +232,14 @@
         </Anchors>
         <Scripts>
           <OnClick>self:GetParent():ExportCSVClicked()</OnClick>
+        </Scripts>
+      </Button>
+      <Button inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_GENERATE_SUGGESTIONS" parentKey="GenerateSuggestions" hidden="true">
+        <Anchors>
+          <Anchor point="RIGHT" relativeKey="$parent.ExportCSV" relativePoint="LEFT" x="-4"/>
+        </Anchors>
+        <Scripts>
+          <OnClick>Auctionator.Shopping.GenerateSuggestions()</OnClick>
         </Scripts>
       </Button>
     </Frames>

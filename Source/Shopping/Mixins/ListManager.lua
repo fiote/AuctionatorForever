@@ -1,5 +1,13 @@
 AuctionatorShoppingListManagerMixin = {}
 
+local suggestedListNames = {
+  Foods = "1: Foods",
+  Drinks = "2: Drinks",
+  Potions = "3: Potions",
+  Elixirs = "4: Elixirs",
+  Burst = "5: Bursts",
+}
+
 -- getData: function() -> table. Returns raw shopping list data storage
 -- setData: function(newVal) newVal: table -> nil. Used to overwrite the
 --  shopping list data storage with new data
@@ -51,6 +59,40 @@ function AuctionatorShoppingListManagerMixin:Sort()
   self:FireMetaChangeEvent()
 end
 
+function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions)
+  local lists = self.getData()
+  local updated = {}
+
+  for index = #lists, 1, -1 do
+    local list = lists[index]
+    if list.suggestedCategory then
+      local items = suggestions[list.suggestedCategory]
+      if items then
+        local name = suggestedListNames[list.suggestedCategory] or list.suggestedCategory
+        list.name = self:GetUnusedName("[Self] " .. name, list.name)
+        list.items = items
+        updated[list.suggestedCategory] = true
+      else
+        table.remove(lists, index)
+      end
+    end
+  end
+
+  for category, items in pairs(suggestions) do
+    if not updated[category] then
+      local name = suggestedListNames[category] or category
+      table.insert(lists, {
+        name = self:GetUnusedName("[Self] " .. name),
+        items = items,
+        isTemporary = true,
+        suggestedCategory = category,
+      })
+    end
+  end
+
+  self:Sort()
+end
+
 function AuctionatorShoppingListManagerMixin:Prune()
   local lists = {}
 
@@ -99,11 +141,11 @@ function AuctionatorShoppingListManagerMixin:Delete(listName)
   self:FireMetaChangeEvent(listName)
 end
 
-function AuctionatorShoppingListManagerMixin:GetUnusedName(prefix)
+function AuctionatorShoppingListManagerMixin:GetUnusedName(prefix, currentName)
   local currentIndex = 1
   local newName = prefix
 
-  while self:GetIndexForName(newName) ~= nil do
+  while newName ~= currentName and self:GetIndexForName(newName) ~= nil do
     currentIndex = currentIndex + 1
     newName = prefix .. " " .. currentIndex
   end

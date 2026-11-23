@@ -62,12 +62,22 @@ function AuctionatorShoppingTabListsContainerMixin:SetOnListItemDrag(func)
   self.onListItemDrag = func
 end
 
-function AuctionatorShoppingTabListsContainerMixin:ExpandList(list)
+function AuctionatorShoppingTabListsContainerMixin:ExpandList(list, searchDirectly)
   if self.expandedList then
     self.expandedList = nil
     if self.onListCollapsed then
       self.onListCollapsed()
     end
+  end
+  self.resultOnlyList = nil
+  if list:SearchesWithoutExpanding() then
+    self.resultOnlyList = list
+    self:Populate()
+    self:ScrollToList(list)
+    if searchDirectly and self.onListSearch then
+      self.onListSearch(list)
+    end
+    return
   end
   self.expandedList = list
   self:Populate()
@@ -79,6 +89,7 @@ end
 
 function AuctionatorShoppingTabListsContainerMixin:CollapseList(list)
   self.expandedList = nil
+  self.resultOnlyList = nil
   self:Populate()
   if list ~= nil then
     self:ScrollToList(list)
@@ -175,7 +186,10 @@ end
 
 function AuctionatorShoppingTabListsContainerMixin:ReceiveEvent(eventName, eventData)
   if eventName == Auctionator.Shopping.Events.ListItemChange then
-    if self.expandedList and self.expandedList:GetName() == eventData then
+    local manager = Auctionator.Shopping.ListManager
+    local index = manager:GetIndexForName(eventData)
+    if (self.expandedList and self.expandedList:GetName() == eventData)
+        or (index and manager:GetByIndex(index):IsSuggested()) then
       self:Populate()
     end
   elseif eventName == Auctionator.Shopping.Events.ListMetaChange then
@@ -194,7 +208,7 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
         if self:IsListExpanded(button.elementData.list) then
           self:CollapseList(button.elementData.list)
         else
-          self:ExpandList(button.elementData.list)
+          self:ExpandList(button.elementData.list, true)
         end
       elseif button.elementData.type == RowType.SearchTerm then
         if self.onSearchTermClicked and self.expandedList then
@@ -235,7 +249,9 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
 
   local function OnListSearchOptionClicked(button)
     button = button:GetParent()
-    if self.onListSearch then
+    if button.elementData.list:SearchesWithoutExpanding() then
+      self:ExpandList(button.elementData.list, true)
+    elseif self.onListSearch then
       self.onListSearch(button.elementData.list)
     end
   end
@@ -328,12 +344,18 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
         color = ORANGE_FONT_COLOR
       end
       local icon = ""
-      if not self:IsListExpanded(elementData.list) then
-        icon = "|TInterface\\AddOns\\Auctionator\\Images\\Plus_Icon:8:8|t"
-      else
-        icon = "|TInterface\\AddOns\\Auctionator\\Images\\Minus_Icon:8:8|t"
+      if not elementData.list:SearchesWithoutExpanding() then
+        if not self:IsListExpanded(elementData.list) then
+          icon = "|TInterface\\AddOns\\Auctionator\\Images\\Plus_Icon:8:8|t"
+        else
+          icon = "|TInterface\\AddOns\\Auctionator\\Images\\Minus_Icon:8:8|t"
+        end
       end
-      button.Text:SetText(icon .. "  " .. color:WrapTextInColorCode(elementData.list:GetName()))
+      local name = elementData.list:GetName()
+      if elementData.list:IsSuggested() then
+        name = ("%s (%d)"):format(name, elementData.list:GetItemCount())
+      end
+      button.Text:SetText(icon .. "  " .. color:WrapTextInColorCode(name))
       button.options1.Icon:SetAtlas("common-search-magnifyingglass")
       button.options1:SetScript("OnClick", OnListSearchOptionClicked)
       button.options1.TooltipText = AUCTIONATOR_L_SEARCH_ALL
@@ -371,7 +393,9 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
 
     button.Text:SetPoint("LEFT", button, "LEFT", xOffset, 0)
     button.Highlight:Hide()
-    button.Selected:SetShown(elementData.type == RowType.List and self.expandedList and elementData.list:GetName() == self.expandedList:GetName())
+    local selectedList = self.expandedList or self.resultOnlyList
+    button.Selected:SetShown(elementData.type == RowType.List and selectedList ~= nil
+      and elementData.list:GetName() == selectedList:GetName())
 
     return button
   end

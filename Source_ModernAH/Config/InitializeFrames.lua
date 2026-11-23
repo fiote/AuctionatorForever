@@ -1,5 +1,5 @@
 function Auctionator.Config.InitializeFrames()
-  Auctionator.Config.InternalInitializeFrames({
+  local frames = {
     "BasicOptions",
     "Tooltips",
 
@@ -13,5 +13,9 @@ function Auctionator.Config.InitializeFrames()
     "Profile",
 
     "Advanced",
-  })
+  }
+  if Auctionator.Shopping.GetSuggestedStats then
+    table.insert(frames, 4, "Suggestions")
+  end
+  Auctionator.Config.InternalInitializeFrames(frames)
 end

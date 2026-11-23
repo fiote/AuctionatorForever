@@ -69,6 +69,9 @@ function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   end
 
   self:StopSearch()
+  if options and options.suggestedCategory then
+    self.suggestedSearch = { category = options.suggestedCategory, listName = options.suggestedListName }
+  end
   self.lastPreventedRowRetried = nil
 
   if self.pendingAutoBuySearch == nil then
@@ -83,10 +86,25 @@ function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   self.searchRunning = true
   Auctionator.EventBus
     :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
-    :Fire(self, Auctionator.Shopping.Tab.Events.SearchStart, terms)
+    :Fire(self, Auctionator.Shopping.Tab.Events.SearchStart, terms, options and options.suggestedCategory)
     :UnregisterSource(self)
   self.SearchProvider:Search(terms, options or {})
   self:StartSpinner()
+end
+
+function AuctionatorShoppingTabFrameMixin:SearchShoppingList(list)
+  local getFilters = Auctionator.Shopping.GetSuggestedSearchFilters
+  local category = list:GetSuggestedCategory()
+  local filters = category and getFilters and getFilters(category)
+  if filters then
+    self:DoSearch({ "" }, {
+      itemClassFilters = filters,
+      suggestedCategory = category,
+      suggestedListName = list:GetName(),
+    })
+  else
+    self:DoSearch(list:GetAllItems())
+  end
 end
 
 function AuctionatorShoppingTabFrameMixin:GetAutoBuyList()
@@ -299,14 +317,21 @@ function AuctionatorShoppingTabFrameMixin:RunInitialAutoLogicPrefetch()
 
   initialAutoLogicPrefetchPending = true
   AutoBuyPrint("Initial prefetch:", shoppingList:GetName())
-  self:DoSearch(shoppingList:GetAllItems())
+  self:SearchShoppingList(shoppingList)
   return true
 end
 
 
 function AuctionatorShoppingTabFrameMixin:StopSearch()
   self.searchRunning = false
+  local suggestedSearch = self.suggestedSearch
+  if suggestedSearch then
+    suggestedSearch.cancelled = true
+  end
   self.SearchProvider:AbortSearch()
+  if suggestedSearch and suggestedSearch.finish then
+    suggestedSearch.finish({})
+  end
 end
 
 function AuctionatorShoppingTabFrameMixin:StartSpinner()
@@ -327,6 +352,7 @@ end
 function AuctionatorShoppingTabFrameMixin:OnLoad()
   Auctionator.EventBus:RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
 
+  self.GenerateSuggestions:SetShown(Auctionator.Shopping.GenerateSuggestions ~= nil)
   self.ResultsListing:Init(self.DataProvider)
   self.autoBuyNextIndex = 1
   self.autoBuyResultsReady = false
@@ -396,32 +422,54 @@ function AuctionatorShoppingTabFrameMixin:OnLoad()
 end
 
 function AuctionatorShoppingTabFrameMixin:SetupSearchProvider()
+  local function FinishSearch(results)
+    self.searchRunning = false
+    if initialAutoLogicPrefetchPending then
+      initialAutoLogicPrefetchPending = false
+      initialAutoLogicPrefetchDone = true
+      AutoBuyPrint("Initial prefetch completed.")
+    end
+    if self.pendingAutoBuySearch ~= nil then
+      self.autoBuyResultsReady = true
+      self.autoBuyLoadedTerms = self.pendingAutoBuySearch.terms
+      AutoBuyPrint("X-to-Buy results ready:", #results, "matches.")
+      self.pendingAutoBuySearch = nil
+      self:PrimeAutoBuyItemPurchase()
+    end
+    Auctionator.EventBus
+      :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
+      :Fire(self, Auctionator.Shopping.Tab.Events.SearchEnd, results)
+      :UnregisterSource(self)
+    self.ListsContainer.SpinnerAnim:Stop()
+    self.ListsContainer.LoadingSpinner:Hide()
+    self.ListsContainer.ResultsText:Hide()
+    FlashClientIcon()
+    PlaySoundFile(567286)
+  end
+
   self.SearchProvider:InitSearch(
     function(results)
-      self.searchRunning = false
-      if initialAutoLogicPrefetchPending then
-        initialAutoLogicPrefetchPending = false
-        initialAutoLogicPrefetchDone = true
-        AutoBuyPrint("Initial prefetch completed.")
+      local suggestedSearch = self.suggestedSearch
+      if not suggestedSearch then
+        FinishSearch(results)
+        return
       end
-      if self.pendingAutoBuySearch ~= nil then
-        self.autoBuyResultsReady = true
-        self.autoBuyLoadedTerms = self.pendingAutoBuySearch.terms
-        AutoBuyPrint("X-to-Buy results ready:", #results, "matches.")
-        self.pendingAutoBuySearch = nil
-        self:PrimeAutoBuyItemPurchase()
+      suggestedSearch.finish = function(filteredResults)
+        if self.suggestedSearch == suggestedSearch then
+          self.suggestedSearch = nil
+          FinishSearch(filteredResults)
+        end
       end
-      Auctionator.EventBus
-        :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
-        :Fire(self, Auctionator.Shopping.Tab.Events.SearchEnd, results)
-        :UnregisterSource(self)
-      self.ListsContainer.SpinnerAnim:Stop()
-      self.ListsContainer.LoadingSpinner:Hide()
-      self.ListsContainer.ResultsText:Hide()
-	    FlashClientIcon()
-      PlaySoundFile(567286)
+      if suggestedSearch.cancelled then
+        suggestedSearch.finish({})
+      else
+        Auctionator.Shopping.FilterSuggestedSearchResults(suggestedSearch.category, results, suggestedSearch.finish)
+      end
     end,
     function(current, total, partialResults)
+      if self.suggestedSearch then
+        return
+      end
       Auctionator.EventBus
         :RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
         :Fire(self, Auctionator.Shopping.Tab.Events.SearchIncrementalUpdate, partialResults, total, current)
@@ -435,7 +483,7 @@ function AuctionatorShoppingTabFrameMixin:SetupListsContainer()
   self.ListsContainer:SetOnListExpanded(function()
     if Auctionator.Config.Get(Auctionator.Config.Options.AUTO_LIST_SEARCH) then
       self.singleSearch = false
-      self:DoSearch(self.ListsContainer:GetExpandedList():GetAllItems())
+      self:SearchShoppingList(self.ListsContainer:GetExpandedList())
     end
     self.SearchOptions:OnListExpanded()
   end)
@@ -463,7 +511,7 @@ function AuctionatorShoppingTabFrameMixin:SetupListsContainer()
   end)
   self.ListsContainer:SetOnListSearch(function(list)
     self.singleSearch = false
-    self:DoSearch(list:GetAllItems())
+    self:SearchShoppingList(list)
   end)
   self.ListsContainer:SetOnListEdit(function(list)
     if list:IsTemporary() then
@@ -529,7 +577,7 @@ function AuctionatorShoppingTabFrameMixin:SetupTopSearch()
     if self.searchRunning then
       self:StopSearch()
     elseif searchTerm == "" and self.ListsContainer:GetExpandedList() ~= nil then
-      self:DoSearch(self.ListsContainer:GetExpandedList():GetAllItems())
+      self:SearchShoppingList(self.ListsContainer:GetExpandedList())
     else
       self.singleSearch = true
       self:DoSearch({searchTerm})
@@ -837,7 +885,9 @@ function AuctionatorShoppingTabFrameMixin:TryBuyNextPreventedRow()
 end
 
 function AuctionatorShoppingTabFrameMixin:GetAppropriateListSearchName()
-  if self.singleSearch or not self.ListsContainer:GetExpandedList() then
+  if self.suggestedSearch and self.suggestedSearch.listName then
+    return self.suggestedSearch.listName
+  elseif self.singleSearch or not self.ListsContainer:GetExpandedList() then
     return AUCTIONATOR_L_NO_LIST
   else
     return self.ListsContainer:GetExpandedList():GetName()
@@ -851,10 +901,11 @@ function AuctionatorShoppingTabFrameMixin:ReceiveEvent(eventName, ...)
 
   elseif eventName == Auctionator.Shopping.Tab.Events.ListSearchRequested then
     self.ContainerTabs:SetView(Auctionator.Constants.ShoppingListViews.Lists)
-    self.ListsContainer:ExpandList(eventData)
-    if not Auctionator.Config.Get(Auctionator.Config.Options.AUTO_LIST_SEARCH) then
+    self.ListsContainer:ExpandList(eventData, true)
+    if not eventData:SearchesWithoutExpanding()
+        and not Auctionator.Config.Get(Auctionator.Config.Options.AUTO_LIST_SEARCH) then
       self.singleSearch = false
-      self:DoSearch(eventData:GetAllItems())
+      self:SearchShoppingList(eventData)
     end
 
   elseif eventName == Auctionator.Shopping.Tab.Events.ShowHistoricalPrices then
@@ -1003,6 +1054,7 @@ function AuctionatorShoppingTabFrameMixin:OpenDefaultList()
   if listIndex ~= nil then
     self.ListsContainer:CollapseList()
     self.ContainerTabs:SetView(Auctionator.Constants.ShoppingListViews.Lists)
-    self.ListsContainer:ExpandList(Auctionator.Shopping.ListManager:GetByIndex(listIndex))
+    self.ListsContainer:ExpandList(Auctionator.Shopping.ListManager:GetByIndex(listIndex),
+      Auctionator.Config.Get(Auctionator.Config.Options.AUTO_LIST_SEARCH))
   end
 end

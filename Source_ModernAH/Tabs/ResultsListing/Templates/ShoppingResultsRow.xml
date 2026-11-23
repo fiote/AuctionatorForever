@@ -5,7 +5,33 @@
     inherits="AuctionatorResultsRowTemplate"
     virtual="true"
     enableMouse="true"
-  >
-
+  />
+  <Frame name="AuctionatorResultsGroupHeaderTemplate" virtual="true">
+    <Layers>
+      <Layer level="BACKGROUND">
+        <Texture>
+          <Anchors>
+            <Anchor point="TOPLEFT" x="4" y="-3"/>
+            <Anchor point="BOTTOMRIGHT" x="-4" y="1"/>
+          </Anchors>
+          <Color r="0.24" g="0.18" b="0.10" a="0.95"/>
+        </Texture>
+      </Layer>
+      <Layer level="ARTWORK">
+        <Texture>
+          <Size y="2"/>
+          <Anchors>
+            <Anchor point="TOPLEFT" x="4" y="-3"/>
+            <Anchor point="TOPRIGHT" x="-4" y="-3"/>
+          </Anchors>
+          <Color r="0.8" g="0.66" b="0.37" a="0.85"/>
+        </Texture>
+        <FontString parentKey="Label" inherits="GameFontNormal">
+          <Anchors>
+            <Anchor point="LEFT" x="14" y="-1"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
   </Frame>
 </Ui>

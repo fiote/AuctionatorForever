@@ -1,0 +1,37 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Frame name="AuctionatorConfigSuggestionsFrameTemplate" mixin="AuctionatorConfigSuggestionsFrameMixin" virtual="true">
+    <Scripts>
+      <OnLoad method="OnLoad"/>
+      <OnShow method="OnShow"/>
+    </Scripts>
+    <Frames>
+      <Frame inherits="AuctionatorConfigurationTitleFrame" parentKey="TitleArea">
+        <Size y="42"/>
+        <KeyValues>
+          <KeyValue key="titleText" value="AUCTIONATOR_L_CONFIG_SUGGESTIONS_CATEGORY" type="global"/>
+        </KeyValues>
+      </Frame>
+      <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="Foods">
+        <Size y="25"/>
+        <KeyValues>
+          <KeyValue key="headingText" value="AUCTIONATOR_L_CONFIG_SUGGESTIONS_FOODS" type="global"/>
+        </KeyValues>
+        <Anchors>
+          <Anchor point="TOPLEFT" relativeKey="$parent.TitleArea" relativePoint="BOTTOMLEFT"/>
+        </Anchors>
+      </Frame>
+      <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="Elixirs">
+        <Size y="25"/>
+        <KeyValues>
+          <KeyValue key="headingText" value="AUCTIONATOR_L_CONFIG_SUGGESTIONS_ELIXIRS" type="global"/>
+        </KeyValues>
+      </Frame>
+      <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="Burst">
+        <Size y="25"/>
+        <KeyValues>
+          <KeyValue key="headingText" value="AUCTIONATOR_L_CONFIG_SUGGESTIONS_BURSTS" type="global"/>
+        </KeyValues>
+      </Frame>
+    </Frames>
+  </Frame>
+</Ui>

@@ -131,6 +131,10 @@ function AuctionatorAHFrameMixin:OnShow()
   InitializeBuyItemFrame()
   InitializeBuyCommodityFrame()
 
+  if Auctionator.Shopping.GenerateSuggestions then
+    Auctionator.Shopping.GenerateSuggestions(true)
+  end
+
   ShowDefaultTab()
 
   C_Timer.After(0, ShowDefaultTab)

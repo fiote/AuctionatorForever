@@ -30,7 +30,7 @@ local function GetQualityFilters(quality)
   end
 end
 
-function AuctionatorDirectSearchProviderMixin:CreateSearchTerm(term)
+function AuctionatorDirectSearchProviderMixin:CreateSearchTerm(term, config)
   Auctionator.Debug.Message("AuctionatorDirectSearchProviderMixin:CreateSearchTerm()", term)
 
   local parsed = Auctionator.Search.SplitAdvancedSearch(term)
@@ -41,7 +41,7 @@ function AuctionatorDirectSearchProviderMixin:CreateSearchTerm(term)
       minLevel = parsed.minLevel,
       maxLevel = parsed.maxLevel,
       filters = GetQualityFilters(parsed.quality),
-      itemClassFilters = Auctionator.Search.GetItemClassCategories(parsed.categoryKey),
+      itemClassFilters = (config and config.itemClassFilters) or Auctionator.Search.GetItemClassCategories(parsed.categoryKey),
       sorts = Auctionator.Constants.ShoppingSorts,
     },
     extraFilters = {

@@ -38,6 +38,22 @@ local SHOPPING_LIST_TABLE_LAYOUT = {
     cellTemplate = "AuctionatorStringCellTemplate",
     cellParameters = { "available" },
     width = 70
+  },
+  {
+    headerTemplate = "AuctionatorStringColumnHeaderTemplate",
+    headerParameters = { "value" },
+    headerText = AUCTIONATOR_L_RESULTS_VALUE_COLUMN,
+    cellTemplate = "AuctionatorStringCellTemplate",
+    cellParameters = { "value" },
+    width = 70,
+  },
+  {
+    headerTemplate = "AuctionatorStringColumnHeaderTemplate",
+    headerParameters = { "stat" },
+    headerText = AUCTIONATOR_L_RESULTS_STAT_COLUMN,
+    cellTemplate = "AuctionatorStringCellTemplate",
+    cellParameters = { "stat" },
+    width = 105,
   }
 }
 
@@ -68,6 +84,13 @@ end
 
 function AuctionatorShoppingTabDataProviderMixin:ReceiveEvent(eventName, eventData, ...)
   if eventName == Auctionator.Shopping.Tab.Events.SearchStart then
+    local category = ...
+    self.groupByStat = category == "Foods" or category == "Elixirs" or category == "Potions" or category == "Burst"
+    if self.groupByStat and not self.presetSort.key then
+      self:UseDefaultGroupedSort()
+    elseif not self.groupByStat and self.usingDefaultGroupedSort then
+      self:SetPresetSort(nil, nil)
+    end
     self:Reset()
     self.onSearchStarted()
   elseif eventName == Auctionator.Shopping.Tab.Events.SearchEnd then
@@ -86,9 +109,74 @@ function AuctionatorShoppingTabDataProviderMixin:PrettifyData(entries)
     end
     entry.available = FormatLargeNumber(entry.totalQuantity)
     entry.itemLevel = entry.itemKey.itemLevel
+    -- Search completion sends the same entries as the incremental updates.
+    entry.value = entry.value or 0
+    entry.stat = entry.stat or ""
+    if not self.groupByStat then
+      entry.startsStatGroup = nil
+    end
   end
 
   return entries
+end
+
+function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyInfo)
+  AuctionatorItemKeyLoadingMixin.ProcessItemKey(self, entry, itemKeyInfo)
+
+  local getFoodOrDrinkValue = Auctionator.Shopping.GetFoodOrDrinkValue
+  local getPotionOrElixirStat = Auctionator.Shopping.GetPotionOrElixirStat
+  if not getFoodOrDrinkValue then
+    return
+  end
+
+  local itemID = entry.itemKey.itemID
+  local function ApplyDetails(value, stat)
+    local sortKey = self.presetSort.key
+    local needsSort = (sortKey == "value" and entry.value ~= value)
+      or (sortKey == "stat" and entry.stat ~= stat)
+      or (self.groupByStat and (entry.stat ~= stat or (sortKey == "stat" and entry.value ~= value)))
+    if entry.value == value and entry.stat == stat then
+      return
+    end
+    entry.value = value
+    entry.stat = stat
+    self:SetDirty()
+    if needsSort and not self.detailsSortQueued then
+      self.detailsSortQueued = true
+      C_Timer.After(0, function()
+        self.detailsSortQueued = false
+        local currentSortKey = self.presetSort.key
+        if currentSortKey and (self.groupByStat or currentSortKey == "value" or currentSortKey == "stat") then
+          self:Sort(currentSortKey, self.presetSort.direction)
+        end
+      end)
+    end
+  end
+
+  local value, foodStat = getFoodOrDrinkValue(itemID)
+  local stat, effectValue = getPotionOrElixirStat(itemID)
+  if value ~= nil and stat ~= nil then
+    ApplyDetails(effectValue or value, foodStat or stat)
+  else
+    local key = self:UniqueKey(entry)
+    Item:CreateFromItemID(itemID):ContinueOnItemLoad(function()
+      if self.insertedKeys[key] ~= entry then
+        return
+      end
+      local loadedStat, loadedEffectValue, spellID = getPotionOrElixirStat(itemID)
+      if spellID then
+        Spell:CreateFromSpellID(spellID):ContinueOnSpellLoad(function()
+          if self.insertedKeys[key] == entry then
+            local spellStat, spellValue = getPotionOrElixirStat(itemID)
+            ApplyDetails(spellValue or 0, spellStat or "")
+          end
+        end)
+      else
+        local loadedFoodValue, loadedFoodStat = getFoodOrDrinkValue(itemID)
+        ApplyDetails(loadedEffectValue or loadedFoodValue or 0, loadedFoodStat or loadedStat or "")
+      end
+    end)
+  end
 end
 
 
@@ -102,10 +190,57 @@ local COMPARATORS = {
   totalQuantity = Auctionator.Utilities.NumberComparator,
   itemLevel = Auctionator.Utilities.NumberComparator,
   isOwned = Auctionator.Utilities.StringComparator,
+  value = Auctionator.Utilities.NumberComparator,
+  stat = Auctionator.Utilities.StringComparator,
 }
+
+function AuctionatorShoppingTabDataProviderMixin:SetPresetSort(fieldName, sortDirection)
+  self.usingDefaultGroupedSort = false
+  AuctionatorDataProviderMixin.SetPresetSort(self, fieldName, sortDirection)
+end
+
+function AuctionatorShoppingTabDataProviderMixin:UseDefaultGroupedSort()
+  self:SetPresetSort("value", Auctionator.Constants.SORT.DESCENDING)
+  self.usingDefaultGroupedSort = true
+end
+
+function AuctionatorShoppingTabDataProviderMixin:ClearSort()
+  if self.groupByStat then
+    self:UseDefaultGroupedSort()
+    self:Sort(self.presetSort.key, self.presetSort.direction)
+  else
+    AuctionatorDataProviderMixin.ClearSort(self)
+  end
+end
 
 function AuctionatorShoppingTabDataProviderMixin:Sort(fieldName, sortDirection)
   local comparator = COMPARATORS[fieldName](sortDirection, fieldName)
+
+  if self.groupByStat then
+    local sortGroupsDescending = fieldName == "stat" and sortDirection == Auctionator.Constants.SORT.DESCENDING
+    if fieldName == "stat" then
+      comparator = Auctionator.Utilities.NumberComparator(Auctionator.Constants.SORT.DESCENDING, "value")
+    end
+    table.sort(self.results, function(left, right)
+      local leftStat, rightStat = left.stat or "", right.stat or ""
+      if leftStat == rightStat then
+        return comparator(left, right)
+      elseif leftStat == "" or rightStat == "" then
+        return rightStat == ""
+      elseif sortGroupsDescending then
+        return leftStat > rightStat
+      end
+      return leftStat < rightStat
+    end)
+    local previousStat
+    for _, entry in ipairs(self.results) do
+      local stat = entry.stat or ""
+      entry.startsStatGroup = previousStat ~= stat
+      previousStat = stat
+    end
+    self:SetDirty()
+    return
+  end
 
   table.sort(self.results, function(left, right)
     return comparator(left, right)
@@ -116,6 +251,23 @@ end
 
 function AuctionatorShoppingTabDataProviderMixin:GetTableLayout()
   return SHOPPING_LIST_TABLE_LAYOUT
+end
+
+function AuctionatorShoppingTabDataProviderMixin:GetDisplayIndexProvider()
+  if not self.groupByStat then
+    return
+  end
+
+  local rows = {}
+  for index = 1, self:GetCount() do
+    local entry = self:GetEntryAt(index)
+    if entry.startsStatGroup then
+      local stat = entry.stat or ""
+      table.insert(rows, { label = stat ~= "" and stat or AUCTIONATOR_L_CONFIG_SUGGESTIONS_NO_STAT })
+    end
+    table.insert(rows, index)
+  end
+  return CreateDataProvider(rows)
 end
 
 function AuctionatorShoppingTabDataProviderMixin:GetColumnHideStates()

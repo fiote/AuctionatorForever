@@ -9,6 +9,13 @@ local minTabWidth = 36
 function AuctionatorTabContainerMixin:OnLoad()
   Auctionator.Debug.Message("AuctionatorTabContainerMixin:OnLoad()")
 
+  if Auctionator.Constants.IsForever then
+    local auctionHouse = AuctionHouseFrame
+    auctionHouse.SellTab:Hide()
+    auctionHouse.AuctionsTab:ClearAllPoints()
+    auctionHouse.AuctionsTab:SetPoint("LEFT", auctionHouse.BuyTab, "RIGHT", -15, 0)
+  end
+
   -- Tabs are sorted to avoid inconsistent ordering based on the addon loading
   -- order
   table.sort(
@@ -43,6 +50,24 @@ function AuctionatorTabContainerMixin:OnLoad()
     if Auctionator.Config.Get(Auctionator.Config.Options.SMALL_TABS) then
       PanelTemplates_TabResize(_G[buttonFrameName], padding, absoluteSize, minTabWidth)
     end
+  end
+
+  if Auctionator.Constants.IsForever then
+    local auctionHouse = AuctionHouseFrame
+    local button = CreateFrame("Button", nil, auctionHouse, "UIPanelDynamicResizeButtonTemplate")
+    auctionHouse.AuctionatorOptionsButton = button
+    button:SetText(AUCTIONATOR_L_OPEN_ADDON_OPTIONS)
+    DynamicResizeButton_Resize(button)
+    button:SetHeight(20)
+    button:SetPoint("TOPLEFT", auctionHouse, "TOPLEFT", 64, -4)
+    local header = auctionHouse.TitleContainer or auctionHouse
+    button:SetFrameStrata("HIGH")
+    button:SetFrameLevel(header:GetFrameLevel() + 20)
+    button:EnableMouse(true)
+    button:RegisterForClicks("LeftButtonUp")
+    button:SetScript("OnClick", AuctionatorConfigTabMixin.OpenOptions)
+    Auctionator.RegisterFontRoot(button)
+    button:Show()
   end
 end
 
