@@ -118,12 +118,36 @@ local function FoodOrDrink(itemID)
   return category, value, stat, statValue
 end
 
-function Auctionator.Shopping.GetFoodOrDrinkValue(itemID)
+local function BandageHealing(itemID)
+  local tooltip = C_TooltipInfo.GetItemByID(itemID)
+  if not tooltip or not tooltip.lines or #tooltip.lines == 0 then
+    return
+  end
+
+  for _, line in ipairs(tooltip.lines) do
+    local text = TooltipLineText(line):lower():gsub("%s+", " ")
+    local effect = text:match("^%s*use:%s*(.+)") or text
+    local amount = effect:match("^(%d[%d,]*)%s+health%s+over%f[%A]")
+      or effect:match("^heals?%s+(%d[%d,]*)%s+damage%f[%A]")
+      or effect:match("^heals?%s+(%d[%d,]*)%s+health%f[%A]")
+      or effect:match("^restores?%s+(%d[%d,]*)%s+health%f[%A]")
+    if amount then
+      return tonumber((amount:gsub(",", "")))
+    end
+  end
+  return 0
+end
+
+function Auctionator.Shopping.GetRecoveryValue(itemID)
   if not itemID or itemID <= 0 then
     return 0
   end
   local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(itemID)
-  if class ~= Enum.ItemClass.Consumable or subclass ~= foodAndDrink then
+  if class ~= Enum.ItemClass.Consumable then
+    return 0
+  elseif subclass == bandage then
+    return BandageHealing(itemID)
+  elseif subclass ~= foodAndDrink then
     return 0
   end
 
@@ -521,6 +545,7 @@ local function GetSuggestionItem(itemID, subclass)
     end
   elseif subclass == bandage then
     requiredFirstAid = BandageFirstAidRequirement(itemID)
+    value = BandageHealing(itemID)
     if not requiredFirstAid then
       return
     end

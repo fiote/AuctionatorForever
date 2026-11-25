@@ -132,9 +132,9 @@ end
 function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyInfo)
   AuctionatorItemKeyLoadingMixin.ProcessItemKey(self, entry, itemKeyInfo)
 
-  local getFoodOrDrinkValue = Auctionator.Shopping.GetFoodOrDrinkValue
+  local getRecoveryValue = Auctionator.Shopping.GetRecoveryValue
   local getPotionOrElixirStat = Auctionator.Shopping.GetPotionOrElixirStat
-  if not getFoodOrDrinkValue then
+  if not getRecoveryValue then
     return
   end
 
@@ -164,7 +164,7 @@ function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyIn
     end
   end
 
-  local value, foodStat, foodStatValue = getFoodOrDrinkValue(itemID)
+  local value, foodStat, foodStatValue = getRecoveryValue(itemID)
   local stat, effectValue = getPotionOrElixirStat(itemID)
   if value ~= nil and stat ~= nil then
     ApplyDetails(effectValue or value, foodStat or stat, foodStatValue)
@@ -183,7 +183,7 @@ function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyIn
           end
         end)
       else
-        local loadedFoodValue, loadedFoodStat, loadedFoodStatValue = getFoodOrDrinkValue(itemID)
+        local loadedFoodValue, loadedFoodStat, loadedFoodStatValue = getRecoveryValue(itemID)
         ApplyDetails(loadedEffectValue or loadedFoodValue or 0, loadedFoodStat or loadedStat or "", loadedFoodStatValue)
       end
     end)

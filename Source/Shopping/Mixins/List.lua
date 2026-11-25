@@ -32,9 +32,7 @@ function AuctionatorShoppingListMixin:GetSuggestedCategory()
 end
 
 function AuctionatorShoppingListMixin:SearchesWithoutExpanding()
-  local category = self:GetSuggestedCategory()
-  return category == "Foods" or category == "Drinks" or category == "Potions"
-    or category == "Elixirs" or category == "Burst"
+  return self:IsSuggested()
 end
 
 function AuctionatorShoppingListMixin:MakePermanent()
