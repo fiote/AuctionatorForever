@@ -455,6 +455,7 @@ AUCTIONATOR_LOCALES.enUS = function()
   L["YOUR_HISTORY"] = "Your History"
   L["EXPORT_RESULTS"] = "Export Results"
   L["GENERATE_SUGGESTIONS"] = "Generate Suggestions"
+  L["GEAR_REQUIRES_PAWN_FOREVER"] = "Enable PawnForever to find gear upgrades."
   L["CONFIG_SUGGESTIONS_CATEGORY"] = "Suggestions"
   L["CONFIG_SUGGESTIONS_FOODS"] = "Foods"
   L["CONFIG_SUGGESTIONS_ELIXIRS"] = "Elixirs"

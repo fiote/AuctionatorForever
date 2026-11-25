@@ -95,9 +95,16 @@ end
 function AuctionatorShoppingTabFrameMixin:SearchShoppingList(list)
   local getFilters = Auctionator.Shopping.GetSuggestedSearchFilters
   local category = list:GetSuggestedCategory()
-  local filters = category and getFilters and getFilters(category)
+  local filters, maxLevel
+  if category and getFilters then
+    filters, maxLevel = getFilters(category)
+  end
   if filters then
-    self:DoSearch({ "" }, {
+    local term = maxLevel and Auctionator.Search.ReconstituteAdvancedSearch({
+      searchString = "",
+      maxLevel = maxLevel,
+    }) or ""
+    self:DoSearch({ term }, {
       itemClassFilters = filters,
       suggestedCategory = category,
       suggestedListName = list:GetName(),

@@ -407,8 +407,77 @@ local function GetSuggestedPotionOrElixirDetails(scan, item)
   end
 end
 
+local inventory = Enum.InventoryType
+local armor = Enum.ItemArmorSubclass
+local armorClass, weaponClass = Enum.ItemClass.Armor, Enum.ItemClass.Weapon
+
+local function GearFilter(classID, inventoryType, subclass)
+  return { classID = classID, subClassID = subclass, inventoryType = inventoryType }
+end
+
+local function ArmorSlot(name, slot, ...)
+  return { name = name, slots = { slot }, armorTypes = { ... } }
+end
+
+local gearSlots = {
+  ArmorSlot("Head", INVSLOT_HEAD, inventory.IndexHeadType),
+  { name = "Neck", slots = { INVSLOT_NECK }, filters = { GearFilter(armorClass, inventory.IndexNeckType, armor.Generic) } },
+  ArmorSlot("Shoulders", INVSLOT_SHOULDER, inventory.IndexShoulderType),
+  { name = "Back", slots = { INVSLOT_BACK }, filters = {
+    GearFilter(armorClass, inventory.IndexCloakType, armor.Generic),
+    GearFilter(armorClass, inventory.IndexCloakType, armor.Cloth),
+  } },
+  ArmorSlot("Chest", INVSLOT_CHEST, inventory.IndexChestType, inventory.IndexRobeType),
+  ArmorSlot("Wrist", INVSLOT_WRIST, inventory.IndexWristType),
+  ArmorSlot("Hands", INVSLOT_HAND, inventory.IndexHandType),
+  ArmorSlot("Waist", INVSLOT_WAIST, inventory.IndexWaistType),
+  ArmorSlot("Legs", INVSLOT_LEGS, inventory.IndexLegsType),
+  ArmorSlot("Feet", INVSLOT_FEET, inventory.IndexFeetType),
+  { name = "Finger", slots = { INVSLOT_FINGER1, INVSLOT_FINGER2 }, filters = {
+    GearFilter(armorClass, inventory.IndexFingerType, armor.Generic),
+  } },
+  { name = "Trinket", slots = { INVSLOT_TRINKET1, INVSLOT_TRINKET2 }, filters = {
+    GearFilter(armorClass, inventory.IndexTrinketType, armor.Generic),
+  } },
+  { name = "Main Hand", slots = { INVSLOT_MAINHAND }, filters = {
+    GearFilter(weaponClass, inventory.IndexWeaponType),
+    GearFilter(weaponClass, inventory.IndexWeaponmainhandType),
+    GearFilter(weaponClass, inventory.Index2HweaponType),
+  } },
+  { name = "Off Hand", slots = { INVSLOT_OFFHAND }, filters = {
+    GearFilter(weaponClass, inventory.IndexWeaponType),
+    GearFilter(weaponClass, inventory.IndexWeaponoffhandType),
+    GearFilter(armorClass, inventory.IndexShieldType, armor.Shield),
+    GearFilter(armorClass, inventory.IndexHoldableType, armor.Generic),
+  } },
+  { name = "Ranged", slots = { INVSLOT_RANGED }, filters = {
+    GearFilter(weaponClass, inventory.IndexRangedType),
+    GearFilter(weaponClass, inventory.IndexRangedrightType),
+    GearFilter(weaponClass, inventory.IndexThrownType),
+    GearFilter(armorClass, inventory.IndexRelicType),
+  } },
+}
+
+local gearByCategory = {}
+for order, gear in ipairs(gearSlots) do
+  gear.order = order
+  gearByCategory["Gear" .. gear.name:gsub(" ", "")] = gear
+end
+
+function Auctionator.Shopping.GetGearSuggestion(category)
+  return gearByCategory[category]
+end
+
+local function NewSuggestions()
+  local suggestions = {}
+  for category in pairs(gearByCategory) do
+    suggestions[category] = {}
+  end
+  return suggestions
+end
+
 local function BuildSuggestions(scan, level)
-  local suggestions, seen = {}, {}
+  local suggestions, seen = NewSuggestions(), {}
   local firstAidRank = math.max(GetSkillRank(firstAidSkillLine), GetSkillRank(foreverFirstAidSkillLine))
   local potionResources = { Health = true }
   local maxMana = UnitPowerMax("player", Enum.PowerType.Mana)
@@ -506,6 +575,7 @@ function Auctionator.Shopping.GenerateSuggestions(silent)
   if not currentScan then
     local items = GetSavedSuggestionItems()
     if not items then
+      Auctionator.Shopping.ListManager:UpdateSuggestedLists(NewSuggestions())
       if not silent then
         Auctionator.Utilities.Message(AUCTIONATOR_L_GENERATE_SUGGESTIONS_NO_SCAN)
       end
@@ -567,7 +637,35 @@ local function GetSuggestionItem(itemID, subclass)
   end
 end
 
+local function GetArmorSubclass(level)
+  local _, class = UnitClass("player")
+  local armor = Enum.ItemArmorSubclass
+  local subclass = armor.Cloth
+  if class == "HUNTER" or class == "SHAMAN" then
+    subclass = level >= 40 and armor.Mail or armor.Leather
+  elseif class == "WARRIOR" or class == "PALADIN" then
+    subclass = level >= 40 and armor.Plate or armor.Mail
+  elseif class == "DRUID" or class == "ROGUE" then
+    subclass = armor.Leather
+  end
+
+  return subclass
+end
+
 function Auctionator.Shopping.GetSuggestedSearchFilters(category)
+  local gear = gearByCategory[category]
+  if gear then
+    local level = UnitLevel("player")
+    if gear.filters then
+      return gear.filters, level
+    end
+    local filters = {}
+    local subclass = GetArmorSubclass(level)
+    for _, inventoryType in ipairs(gear.armorTypes) do
+      table.insert(filters, GearFilter(armorClass, inventoryType, subclass))
+    end
+    return filters, level
+  end
   if category == "Foods" or category == "Drinks" then
     return { { classID = Enum.ItemClass.Consumable, subClassID = foodAndDrink } }
   end
@@ -581,7 +679,111 @@ function Auctionator.Shopping.GetSuggestedSearchFilters(category)
   end
 end
 
+local function ScoreForGearSlot(verdict, slots, link)
+  if type(verdict) ~= "table" or verdict.usable == false then
+    return
+  end
+  if slots[verdict.slot] then
+    return verdict.slot, verdict.score
+  end
+  local byHand = verdict.byHand
+  if byHand and slots[INVSLOT_MAINHAND] then
+    return INVSLOT_MAINHAND, byHand[INVSLOT_MAINHAND]
+  end
+  if byHand and slots[INVSLOT_OFFHAND] and CanDualWield and CanDualWield()
+      and select(4, C_Item.GetItemInfoInstant(link)) == "INVTYPE_WEAPON" then
+    return INVSLOT_OFFHAND, byHand[INVSLOT_OFFHAND]
+  end
+end
+
+local function FilterGearUpgrades(gear, rows, callback)
+  local upgrades = PawnForever and PawnForever.Upgrades
+  if not upgrades or not upgrades.Check then
+    Auctionator.Utilities.Message(AUCTIONATOR_L_GEAR_REQUIRES_PAWN_FOREVER)
+    callback({})
+    return
+  end
+
+  local wornLinks, eligibleSlots = {}, {}
+  for _, slot in ipairs(gear.slots) do
+    eligibleSlots[slot] = true
+    wornLinks[slot] = GetInventoryItemLink("player", slot)
+  end
+  local pending, accepted = {}, {}
+  for index, row in ipairs(rows) do
+    if row.itemKey and (row.totalQuantity or 0) > 0 then
+      pending[index] = row
+    end
+  end
+
+  local deadline = GetTime() + 3
+  local function CheckRows()
+    local wornScores = {}
+    for slot in pairs(eligibleSlots) do
+      local link = wornLinks[slot]
+      local worn = link and upgrades:Check(link)
+      if not link then
+        wornScores[slot] = 0
+      elseif type(worn) == "table" then
+        wornScores[slot] = (worn.byHand and worn.byHand[slot]) or worn.score
+      end
+    end
+    for index, row in pairs(pending) do
+      local key = row.itemKey
+      local link = row.itemLink or Auctionator.Utilities.GetItemLinkFromItemKey(key)
+      if not link and (key.itemSuffix or 0) == 0 then
+        local _, baseLink, _, itemLevel = C_Item.GetItemInfo(key.itemID)
+        if not key.itemLevel or key.itemLevel == 0 or key.itemLevel == itemLevel then
+          link = baseLink
+        end
+      end
+
+      local verdict
+      if link then
+        verdict = upgrades:Check(link)
+      end
+      if verdict ~= nil then
+        local slot, score = ScoreForGearSlot(verdict, eligibleSlots, link)
+        if type(score) ~= "number" then
+          pending[index] = nil
+        else
+          local wornScore = wornScores[slot]
+          if type(wornScore) == "number" then
+            pending[index] = nil
+            if score > wornScore then
+              row.itemLink = link
+              row.gearUpgradePercent = wornScore > 0 and ((score - wornScore) / wornScore * 100) or false
+              accepted[index] = row
+            end
+          end
+        end
+      elseif not link then
+        C_Item.RequestLoadItemDataByID(key.itemID)
+      end
+    end
+
+    if next(pending) and GetTime() < deadline then
+      C_Timer.After(0.15, CheckRows)
+      return
+    end
+
+    local results = {}
+    for index = 1, #rows do
+      if accepted[index] then
+        table.insert(results, accepted[index])
+      end
+    end
+    callback(results)
+  end
+  CheckRows()
+end
+
 function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callback)
+  local gear = gearByCategory[category]
+  if gear then
+    FilterGearUpgrades(gear, rows, callback)
+    return
+  end
   local scan = { items = {}, requestedFoodOrDrinks = {} }
   local candidates, requested = {}, {}
   local pending, finished = 1, false

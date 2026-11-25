@@ -5,7 +5,7 @@ local function IsEquipmentItem(itemID)
   return classType ~= nil and Auctionator.Utilities.IsEquipment(classType)
 end
 
-local function GetItemLinkFromItemKey(itemKey)
+function Auctionator.Utilities.GetItemLinkFromItemKey(itemKey)
   if not itemKey or not C_TooltipInfo or not C_TooltipInfo.GetItemKey then
     return nil
   end
@@ -85,7 +85,7 @@ function AuctionatorItemKeyLoadingMixin:ProcessItemKey(rowEntry, itemKeyInfo)
   rowEntry.gearQualityTier = nil
 
   if rowEntry.itemLink == nil then
-    rowEntry.itemLink = GetItemLinkFromItemKey(rowEntry.itemKey)
+    rowEntry.itemLink = Auctionator.Utilities.GetItemLinkFromItemKey(rowEntry.itemKey)
   end
 
   if isEquipment then

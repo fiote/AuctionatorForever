@@ -52,6 +52,10 @@ function AuctionatorResultsListingMixin:InitializeDataProvider()
   end)
 
   self.dataProvider:SetOnSearchStartedCallback(function()
+    if self.dataProvider.GetForcedHiddenColumns then
+      self:UpdateDimensionsForHiding()
+      self:ApplyHiding()
+    end
     self.ScrollArea.NoResultsText:Hide()
     self:EnableSpinner()
   end)
@@ -169,18 +173,26 @@ function AuctionatorResultsListingMixin:ClearColumnSorts()
   end
 end
 
+function AuctionatorResultsListingMixin:GetForcedHiddenColumns()
+  local provider = self.dataProvider
+  return provider.GetForcedHiddenColumns and provider:GetForcedHiddenColumns()
+end
+
 function AuctionatorResultsListingMixin:CustomiseColumns()
   if self.dataProvider:GetColumnHideStates() ~= nil then
     local hideStates = self.dataProvider:GetColumnHideStates()
+    local forced = self:GetForcedHiddenColumns() or {}
     local listing = {}
     for _, column in ipairs(self.columnSpecification) do
-      table.insert(listing, {column.headerText, column.headerText})
+      if not forced[column.headerText] then
+        table.insert(listing, {column.headerText, column.headerText})
+      end
     end
 
     local function MoreThanOneVisible()
       local count = 0
       for _, column in ipairs(self.columnSpecification) do
-        if not hideStates[column.headerText] then
+        if not forced[column.headerText] and (not hideStates[column.headerText] or self.fallbackColumn == column.headerText) then
           count = count + 1
         end
       end
@@ -190,7 +202,7 @@ function AuctionatorResultsListingMixin:CustomiseColumns()
 
     local _, menu
     menu = MenuUtil.CreateCheckboxContextMenu(self, function(headerText)
-      return not hideStates[headerText]
+      return not hideStates[headerText] or self.fallbackColumn == headerText
     end, function(headerText)
       hideStates[headerText] = MoreThanOneVisible() and not hideStates[headerText]
       menu:Close()
@@ -217,9 +229,10 @@ function AuctionatorResultsListingMixin:ApplyHiding()
     return
   end
 
+  local forced = self:GetForcedHiddenColumns() or {}
   for index, column in ipairs(self.tableBuilder:GetColumns()) do
-    local columnEntry = self.columnSpecification[index]
-    SetColumnShown(column, not hidingDetails[columnEntry.headerText])
+    local header = self.columnSpecification[index].headerText
+    SetColumnShown(column, not forced[header] and (not hidingDetails[header] or self.fallbackColumn == header))
   end
 end
 
@@ -236,19 +249,27 @@ function AuctionatorResultsListingMixin:UpdateDimensionsForHiding()
   end
 
   local hidingDetails = self.dataProvider:GetColumnHideStates()
+  local forced = self:GetForcedHiddenColumns() or {}
+  self.fallbackColumn = nil
 
   local anyFlexibleWidths = false
-  local visibleColumn
+  local visibleColumn, fallbackColumn, fallbackHeader
 
   for index, column in ipairs(self.tableBuilder:GetColumns()) do
     local columnEntry = self.columnSpecification[index]
 
     -- Import default value if hidden state not already set.
-    if hidingDetails[columnEntry.headerText] == nil then
-      hidingDetails[columnEntry.headerText] = columnEntry.defaultHide or false
+    local header = columnEntry.headerText
+    if not forced[header] then
+      if hidingDetails[header] == nil then
+        hidingDetails[header] = columnEntry.defaultHide or false
+      end
+      if not fallbackColumn or header == AUCTIONATOR_L_RESULTS_NAME_COLUMN then
+        fallbackColumn, fallbackHeader = column, header
+      end
     end
 
-    if hidingDetails[columnEntry.headerText] then
+    if forced[header] or hidingDetails[header] then
       SetColumnShown(column, false)
       column:SetFixedConstraints(0.001, 0)
     else
@@ -269,7 +290,12 @@ function AuctionatorResultsListingMixin:UpdateDimensionsForHiding()
 
   -- Checking that at least one column will fill up empty space, if there isn't
   -- one, the first visible column is modified to do so.
-  if not anyFlexibleWidths then
+  if not visibleColumn and fallbackColumn then
+    self.fallbackColumn = fallbackHeader
+    visibleColumn = fallbackColumn
+    SetColumnShown(visibleColumn, true)
+  end
+  if not anyFlexibleWidths and visibleColumn then
     visibleColumn:SetFillConstraints(1.0, 0)
   end
 

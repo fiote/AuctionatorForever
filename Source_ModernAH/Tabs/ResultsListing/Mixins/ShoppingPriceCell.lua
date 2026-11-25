@@ -1,6 +1,6 @@
 AuctionatorShoppingPriceCellTemplateMixin = CreateFromMixins(AuctionatorStringCellTemplateMixin)
 
-local RIGHT_PADDING = 12
+local RIGHT_PADDING = 8
 
 function AuctionatorShoppingPriceCellTemplateMixin:Init(columnName)
   AuctionatorStringCellTemplateMixin.Init(self, columnName)

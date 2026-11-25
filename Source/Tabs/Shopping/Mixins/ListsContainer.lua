@@ -352,7 +352,8 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
         end
       end
       local name = elementData.list:GetName()
-      if elementData.list:IsSuggested() then
+      local getGear = Auctionator.Shopping.GetGearSuggestion
+      if elementData.list:IsSuggested() and not (getGear and getGear(elementData.list:GetSuggestedCategory())) then
         name = ("%s (%d)"):format(name, elementData.list:GetItemCount())
       end
       button.Text:SetText(icon .. "  " .. color:WrapTextInColorCode(name))

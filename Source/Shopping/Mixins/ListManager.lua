@@ -1,12 +1,6 @@
 AuctionatorShoppingListManagerMixin = {}
 
-local suggestedListNames = {
-  Foods = "1: Foods",
-  Drinks = "2: Drinks",
-  Potions = "3: Potions",
-  Elixirs = "4: Elixirs",
-  Burst = "5: Bursts",
-}
+local itemOrder = { Foods = 1, Drinks = 2, Potions = 3, Elixirs = 4, Burst = 5 }
 
 -- getData: function() -> table. Returns raw shopping list data storage
 -- setData: function(newVal) newVal: table -> nil. Used to overwrite the
@@ -43,17 +37,43 @@ function AuctionatorShoppingListManagerMixin:Create(listName, isTemporary)
   self:FireMetaChangeEvent(listName)
 end
 
+local function GetGearSuggestion(category)
+  local getGear = Auctionator.Shopping.GetGearSuggestion
+  return getGear and getGear(category) or nil
+end
+
+local function GetSuggestedListName(category)
+  local gear = GetGearSuggestion(category)
+  if gear then
+    return "[Gear] " .. gear.name
+  end
+  return "[Item] " .. (category == "Burst" and "Bursts" or category)
+end
+
+local function GetListSortKey(list)
+  local category = list.suggestedCategory
+  local gear = GetGearSuggestion(category)
+  -- Use one alphabetical position for both generated groups.
+  if gear then
+    return "[gear]", 2, gear.order
+  elseif category then
+    return "[gear]", 1, itemOrder[category] or math.huge
+  end
+  return list.name:lower(), 3, 0
+end
+
 function AuctionatorShoppingListManagerMixin:Sort()
   table.sort(self.getData(), function(left, right)
-    local lowerLeft = string.lower(left.name)
-    local lowerRight = string.lower(right.name)
-
-    -- Handle case where names are the same, when ignoring lettercase
-    if lowerLeft == lowerRight then
-      return left.name < right.name
-    else
-      return lowerLeft < lowerRight
+    local leftKey, leftGroup, leftOrder = GetListSortKey(left)
+    local rightKey, rightGroup, rightOrder = GetListSortKey(right)
+    if leftKey ~= rightKey then
+      return leftKey < rightKey
+    elseif leftGroup ~= rightGroup then
+      return leftGroup < rightGroup
+    elseif leftOrder ~= rightOrder then
+      return leftOrder < rightOrder
     end
+    return left.name < right.name
   end)
 
   self:FireMetaChangeEvent()
@@ -68,8 +88,8 @@ function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions)
     if list.suggestedCategory then
       local items = suggestions[list.suggestedCategory]
       if items then
-        local name = suggestedListNames[list.suggestedCategory] or list.suggestedCategory
-        list.name = self:GetUnusedName("[Self] " .. name, list.name)
+        local name = GetSuggestedListName(list.suggestedCategory)
+        list.name = self:GetUnusedName(name, list.name)
         list.items = items
         updated[list.suggestedCategory] = true
       else
@@ -80,9 +100,9 @@ function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions)
 
   for category, items in pairs(suggestions) do
     if not updated[category] then
-      local name = suggestedListNames[category] or category
+      local name = GetSuggestedListName(category)
       table.insert(lists, {
-        name = self:GetUnusedName("[Self] " .. name),
+        name = self:GetUnusedName(name),
         items = items,
         isTemporary = true,
         suggestedCategory = category,
