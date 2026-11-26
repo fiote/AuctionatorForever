@@ -20,6 +20,8 @@ end
 
 function AuctionatorShoppingPriceCellTemplateMixin:Init(columnName, isValueColumn)
   AuctionatorStringCellTemplateMixin.Init(self, columnName)
+  -- The base initializer resets alignment even when the cell is reused.
+  self.moneyLayout = nil
   self.isValueColumn = isValueColumn
   self:SetMoneyLayout(not isValueColumn)
 end
