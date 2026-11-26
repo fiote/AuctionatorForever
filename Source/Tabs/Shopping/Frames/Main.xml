@@ -234,12 +234,20 @@
           <OnClick>self:GetParent():ExportCSVClicked()</OnClick>
         </Scripts>
       </Button>
-      <Button inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_GENERATE_SUGGESTIONS" parentKey="GenerateSuggestions" hidden="true">
+      <Button inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_GENERATE_SUGGESTIONS_ALT" parentKey="GenerateSuggestionsAlt" hidden="true">
         <Anchors>
           <Anchor point="RIGHT" relativeKey="$parent.ExportCSV" relativePoint="LEFT" x="-4"/>
         </Anchors>
         <Scripts>
-          <OnClick>Auctionator.Shopping.GenerateSuggestions()</OnClick>
+          <OnClick>self:GetParent():GenerateSuggestionsClicked(true)</OnClick>
+        </Scripts>
+      </Button>
+      <Button inherits="UIPanelDynamicResizeButtonTemplate" text="AUCTIONATOR_L_GENERATE_SUGGESTIONS_MAIN" parentKey="GenerateSuggestions" hidden="true">
+        <Anchors>
+          <Anchor point="RIGHT" relativeKey="$parent.GenerateSuggestionsAlt" relativePoint="LEFT" x="-4"/>
+        </Anchors>
+        <Scripts>
+          <OnClick>self:GetParent():GenerateSuggestionsClicked(false)</OnClick>
         </Scripts>
       </Button>
     </Frames>

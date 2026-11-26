@@ -79,7 +79,7 @@ function AuctionatorShoppingListManagerMixin:Sort()
   self:FireMetaChangeEvent()
 end
 
-function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions)
+function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions, keepOtherLists)
   local lists = self.getData()
   local updated = {}
 
@@ -92,7 +92,7 @@ function AuctionatorShoppingListManagerMixin:UpdateSuggestedLists(suggestions)
         list.name = self:GetUnusedName(name, list.name)
         list.items = items
         updated[list.suggestedCategory] = true
-      else
+      elseif not keepOtherLists then
         table.remove(lists, index)
       end
     end

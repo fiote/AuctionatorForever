@@ -69,8 +69,13 @@ function AuctionatorShoppingTabFrameMixin:DoSearch(terms, options)
   end
 
   self:StopSearch()
+  self.activeGearList = options and options.gearList
   if options and options.suggestedCategory then
-    self.suggestedSearch = { category = options.suggestedCategory, listName = options.suggestedListName }
+    self.suggestedSearch = {
+      category = options.suggestedCategory,
+      listName = options.suggestedListName,
+      gearScale = options.gearScale,
+    }
   end
   self.lastPreventedRowRetried = nil
 
@@ -100,6 +105,9 @@ function AuctionatorShoppingTabFrameMixin:SearchShoppingList(list)
     filters, maxLevel = getFilters(category)
   end
   if filters then
+    local getGear = Auctionator.Shopping.GetGearSuggestion
+    local gear = getGear and getGear(category)
+    local gearScale = gear and self.useAlternateGearScale and Auctionator.Shopping.GetAlternateGearScale()
     local term = maxLevel and Auctionator.Search.ReconstituteAdvancedSearch({
       searchString = "",
       maxLevel = maxLevel,
@@ -108,9 +116,40 @@ function AuctionatorShoppingTabFrameMixin:SearchShoppingList(list)
       itemClassFilters = filters,
       suggestedCategory = category,
       suggestedListName = list:GetName(),
+      gearList = gear and list or nil,
+      gearScale = gearScale or nil,
     })
   else
     self:DoSearch(list:GetAllItems())
+  end
+end
+
+function AuctionatorShoppingTabFrameMixin:UpdateSuggestionButtons()
+  local getAlternate = Auctionator.Shopping.GetAlternateGearScale
+  local alternate = getAlternate and getAlternate()
+  self.GenerateSuggestionsAlt:SetEnabled(alternate ~= nil)
+  if not alternate then
+    local wasUsingAlternate = self.useAlternateGearScale
+    self.useAlternateGearScale = false
+    if wasUsingAlternate and self:IsVisible() and self.activeGearList then
+      self:SearchShoppingList(self.activeGearList)
+    end
+  end
+  return alternate
+end
+
+function AuctionatorShoppingTabFrameMixin:GenerateSuggestionsClicked(useAlternate)
+  if useAlternate and not self:UpdateSuggestionButtons() then
+    return
+  end
+  self.useAlternateGearScale = useAlternate
+  if useAlternate then
+    Auctionator.Shopping.GenerateGearSuggestions()
+  else
+    Auctionator.Shopping.GenerateSuggestions()
+  end
+  if self.activeGearList then
+    self:SearchShoppingList(self.activeGearList)
   end
 end
 
@@ -359,7 +398,17 @@ end
 function AuctionatorShoppingTabFrameMixin:OnLoad()
   Auctionator.EventBus:RegisterSource(self, "AuctionatorShoppingTabFrameMixin")
 
-  self.GenerateSuggestions:SetShown(Auctionator.Shopping.GenerateSuggestions ~= nil)
+  local showSuggestions = Auctionator.Shopping.GenerateSuggestions ~= nil
+  self.GenerateSuggestions:SetShown(showSuggestions)
+  self.GenerateSuggestionsAlt:SetShown(showSuggestions)
+  if showSuggestions then
+    self:UpdateSuggestionButtons()
+    if PawnForever and PawnForever.On then
+      PawnForever:On("REFRESH", function()
+        self:UpdateSuggestionButtons()
+      end)
+    end
+  end
   self.ResultsListing:Init(self.DataProvider)
   self.autoBuyNextIndex = 1
   self.autoBuyResultsReady = false
@@ -470,7 +519,8 @@ function AuctionatorShoppingTabFrameMixin:SetupSearchProvider()
       if suggestedSearch.cancelled then
         suggestedSearch.finish({})
       else
-        Auctionator.Shopping.FilterSuggestedSearchResults(suggestedSearch.category, results, suggestedSearch.finish)
+        Auctionator.Shopping.FilterSuggestedSearchResults(
+          suggestedSearch.category, results, suggestedSearch.finish, suggestedSearch.gearScale)
       end
     end,
     function(current, total, partialResults)
@@ -1025,6 +1075,7 @@ function AuctionatorShoppingTabFrameMixin:OnEvent(eventName, ...)
 end
 
 function AuctionatorShoppingTabFrameMixin:OnShow()
+  self:UpdateSuggestionButtons()
   -- self.SearchOptions:FocusSearchBox()
   Auctionator.EventBus:Register(self, EVENTBUS_EVENTS)
 

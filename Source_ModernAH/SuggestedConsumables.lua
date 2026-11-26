@@ -571,6 +571,17 @@ QueueRefresh = function(scan)
   end)
 end
 
+function Auctionator.Shopping.GetAlternateGearScale()
+  local pawn = PawnForever
+  if pawn and pawn.char and pawn.Scales and pawn.Scales.Second then
+    return pawn.Scales:Second()
+  end
+end
+
+function Auctionator.Shopping.GenerateGearSuggestions()
+  Auctionator.Shopping.ListManager:UpdateSuggestedLists(NewSuggestions(), true)
+end
+
 function Auctionator.Shopping.GenerateSuggestions(silent)
   if not currentScan then
     local items = GetSavedSuggestionItems()
@@ -696,7 +707,7 @@ local function ScoreForGearSlot(verdict, slots, link)
   end
 end
 
-local function FilterGearUpgrades(gear, rows, callback)
+local function FilterGearUpgrades(gear, rows, callback, scale)
   local upgrades = PawnForever and PawnForever.Upgrades
   if not upgrades or not upgrades.Check then
     Auctionator.Utilities.Message(AUCTIONATOR_L_GEAR_REQUIRES_PAWN_FOREVER)
@@ -704,6 +715,8 @@ local function FilterGearUpgrades(gear, rows, callback)
     return
   end
 
+  local scales = PawnForever.Scales
+  scale = scale or (scales and scales.Main and scales:Main())
   local wornLinks, eligibleSlots = {}, {}
   for _, slot in ipairs(gear.slots) do
     eligibleSlots[slot] = true
@@ -721,7 +734,7 @@ local function FilterGearUpgrades(gear, rows, callback)
     local wornScores = {}
     for slot in pairs(eligibleSlots) do
       local link = wornLinks[slot]
-      local worn = link and upgrades:Check(link)
+      local worn = link and upgrades:Check(link, scale)
       if not link then
         wornScores[slot] = 0
       elseif type(worn) == "table" then
@@ -740,7 +753,7 @@ local function FilterGearUpgrades(gear, rows, callback)
 
       local verdict
       if link then
-        verdict = upgrades:Check(link)
+        verdict = upgrades:Check(link, scale)
       end
       if verdict ~= nil then
         local slot, score = ScoreForGearSlot(verdict, eligibleSlots, link)
@@ -778,10 +791,10 @@ local function FilterGearUpgrades(gear, rows, callback)
   CheckRows()
 end
 
-function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callback)
+function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callback, gearScale)
   local gear = gearByCategory[category]
   if gear then
-    FilterGearUpgrades(gear, rows, callback)
+    FilterGearUpgrades(gear, rows, callback, gearScale)
     return
   end
   local scan = { items = {}, requestedFoodOrDrinks = {} }
