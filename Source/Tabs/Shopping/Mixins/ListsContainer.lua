@@ -4,10 +4,24 @@
 AuctionatorShoppingTabListsContainerMixin = {}
 
 RowType = {
+  Group = "suggestion group",
   List = "list header",
   SearchTerm = "list entry",
   Empty = "list empty",
 }
+
+local function GetSuggestionGroup(list)
+  if not list:IsSuggested() then
+    return
+  end
+  local getGear = Auctionator.Shopping.GetGearSuggestion
+  return getGear and getGear(list:GetSuggestedCategory()) and "[Gear]" or "[Item]"
+end
+
+local function ExpansionIcon(expanded)
+  local icon = expanded and "Minus_Icon" or "Plus_Icon"
+  return "|TInterface\\AddOns\\Auctionator\\Images\\" .. icon .. ":8:8|t"
+end
 
 local listHeaderInset = 10
 local listEntryInset = 30
@@ -72,6 +86,7 @@ function AuctionatorShoppingTabListsContainerMixin:ExpandList(list, searchDirect
   self.resultOnlyList = nil
   if list:SearchesWithoutExpanding() then
     self.resultOnlyList = list
+    self.expandedSuggestionGroups[GetSuggestionGroup(list)] = true
     self:Populate()
     self:ScrollToList(list)
     if searchDirectly and self.onListSearch then
@@ -111,6 +126,9 @@ function AuctionatorShoppingTabListsContainerMixin:ScrollToList(list)
   local dataIndex = self.ScrollBox:FindElementDataIndexByPredicate(function(elementData)
     return elementData.type == RowType.List and elementData.list:GetName() == list:GetName()
   end)
+  if not dataIndex then
+    return
+  end
   local scrollOffset = self.ScrollBox:GetDerivedScrollOffset()
   local dataIndexExtent = (self.ScrollBox:GetExtentUntil(dataIndex) - scrollOffset) / self.ScrollBox:GetVisibleExtent()
   if dataIndexExtent > 0.5 then
@@ -140,6 +158,7 @@ function AuctionatorShoppingTabListsContainerMixin:GetExpandedList()
 end
 
 function AuctionatorShoppingTabListsContainerMixin:OnLoad()
+  self.expandedSuggestionGroups = {}
   self:SetupContent()
 
   if self:IsVisible() then
@@ -204,7 +223,11 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
         self:CollapseList(self.expandedList)
       end
     else
-      if button.elementData.type == RowType.List then
+      if button.elementData.type == RowType.Group then
+        local group = button.elementData.group
+        self.expandedSuggestionGroups[group] = not self.expandedSuggestionGroups[group]
+        self:Populate()
+      elseif button.elementData.type == RowType.List then
         if self:IsListExpanded(button.elementData.list) then
           self:CollapseList(button.elementData.list)
         else
@@ -337,26 +360,28 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
     local text = ""
     local xOffset
     button.elementData = elementData
-    if elementData.type == RowType.List then
+    if elementData.type == RowType.Group then
       xOffset = listHeaderInset
+      local icon = ExpansionIcon(self.expandedSuggestionGroups[elementData.group])
+      button.Text:SetText(icon .. "  " .. NORMAL_FONT_COLOR:WrapTextInColorCode(elementData.group))
+    elseif elementData.type == RowType.List then
+      xOffset = elementData.group and listEntryInset or listHeaderInset
       local color = NORMAL_FONT_COLOR
       if elementData.list:IsTemporary() then
         color = ORANGE_FONT_COLOR
       end
       local icon = ""
       if not elementData.list:SearchesWithoutExpanding() then
-        if not self:IsListExpanded(elementData.list) then
-          icon = "|TInterface\\AddOns\\Auctionator\\Images\\Plus_Icon:8:8|t"
-        else
-          icon = "|TInterface\\AddOns\\Auctionator\\Images\\Minus_Icon:8:8|t"
-        end
+        icon = ExpansionIcon(self:IsListExpanded(elementData.list))
       end
       local name = elementData.list:GetName()
-      local getGear = Auctionator.Shopping.GetGearSuggestion
-      if elementData.list:IsSuggested() and not (getGear and getGear(elementData.list:GetSuggestedCategory())) then
+      if elementData.group then
+        name = name:sub(#elementData.group + 2)
+      end
+      if elementData.group == "[Item]" then
         name = ("%s (%d)"):format(name, elementData.list:GetItemCount())
       end
-      button.Text:SetText(icon .. "  " .. color:WrapTextInColorCode(name))
+      button.Text:SetText((icon ~= "" and (icon .. "  ") or "") .. color:WrapTextInColorCode(name))
       button.options1.Icon:SetAtlas("common-search-magnifyingglass")
       button.options1:SetScript("OnClick", OnListSearchOptionClicked)
       button.options1.TooltipText = AUCTIONATOR_L_SEARCH_ALL
@@ -421,14 +446,19 @@ function AuctionatorShoppingTabListsContainerMixin:SetupContent()
 end
 
 function AuctionatorShoppingTabListsContainerMixin:Populate()
-  local rows = {}
+  local rows, addedGroups = {}, {}
+  local manager = Auctionator.Shopping.ListManager
 
-  for index = 1, Auctionator.Shopping.ListManager:GetCount() do
-    local list = Auctionator.Shopping.ListManager:GetByIndex(index)
-    table.insert(rows, {
-      type = RowType.List,
-      list = list,
-    })
+  for index = 1, manager:GetCount() do
+    local list = manager:GetByIndex(index)
+    local group = GetSuggestionGroup(list)
+    if group and not addedGroups[group] then
+      table.insert(rows, { type = RowType.Group, group = group })
+      addedGroups[group] = true
+    end
+    if not group or self.expandedSuggestionGroups[group] then
+      table.insert(rows, { type = RowType.List, list = list, group = group })
+    end
     if self:IsListExpanded(list) then
       for index, item in ipairs(list:GetAllItems()) do
         table.insert(rows, {
