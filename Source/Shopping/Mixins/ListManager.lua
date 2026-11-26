@@ -42,7 +42,16 @@ local function GetGearSuggestion(category)
   return getGear and getGear(category) or nil
 end
 
+local function GetVendorSuggestion(category)
+  local getVendor = Auctionator.Shopping.GetVendorSuggestion
+  return getVendor and getVendor(category)
+end
+
 local function GetSuggestedListName(category)
+  local vendor = GetVendorSuggestion(category)
+  if vendor then
+    return "[Vendor] " .. vendor.name
+  end
   local gear = GetGearSuggestion(category)
   if gear then
     return "[Gear] " .. gear.name
@@ -53,13 +62,16 @@ end
 local function GetListSortKey(list)
   local category = list.suggestedCategory
   local gear = GetGearSuggestion(category)
-  -- Use one alphabetical position for both generated groups.
+  local vendor = GetVendorSuggestion(category)
+  -- Keep the generated groups together while retaining the manual lists' name order.
   if gear then
     return "[gear]", 2, gear.order
+  elseif vendor then
+    return "[gear]", 3, vendor.quality * 10 + (vendor.order or 0)
   elseif category then
     return "[gear]", 1, itemOrder[category] or math.huge
   end
-  return list.name:lower(), 3, 0
+  return list.name:lower(), 4, 0
 end
 
 function AuctionatorShoppingListManagerMixin:Sort()

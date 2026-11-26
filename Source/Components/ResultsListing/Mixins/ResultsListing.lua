@@ -179,6 +179,9 @@ function AuctionatorResultsListingMixin:GetForcedHiddenColumns()
 end
 
 function AuctionatorResultsListingMixin:CustomiseColumns()
+  if self.dataProvider.CanCustomiseColumns and not self.dataProvider:CanCustomiseColumns() then
+    return
+  end
   if self.dataProvider:GetColumnHideStates() ~= nil then
     local hideStates = self.dataProvider:GetColumnHideStates()
     local forced = self:GetForcedHiddenColumns() or {}
@@ -275,8 +278,12 @@ function AuctionatorResultsListingMixin:UpdateDimensionsForHiding()
     else
       SetColumnShown(column, true)
 
-      if columnEntry.width ~= nil then
-        column:SetFixedConstraints(columnEntry.width, 0)
+      local columnWidth = columnEntry.width
+      if self.dataProvider.GetColumnWidth then
+        columnWidth = self.dataProvider:GetColumnWidth(columnEntry)
+      end
+      if columnWidth ~= nil then
+        column:SetFixedConstraints(columnWidth, 0)
       else
         anyFlexibleWidths = true
         column:SetFillConstraints(1.0, 0)

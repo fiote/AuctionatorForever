@@ -14,6 +14,10 @@ local function GetSuggestionGroup(list)
   if not list:IsSuggested() then
     return
   end
+  local getVendor = Auctionator.Shopping.GetVendorSuggestion
+  if getVendor and getVendor(list:GetSuggestedCategory()) then
+    return "[Vendor]"
+  end
   local getGear = Auctionator.Shopping.GetGearSuggestion
   return getGear and getGear(list:GetSuggestedCategory()) and "[Gear]" or "[Item]"
 end

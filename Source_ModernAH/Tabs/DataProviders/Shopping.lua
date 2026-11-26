@@ -1,3 +1,5 @@
+local PRICE_COLUMN_WIDTH = 128
+
 local SHOPPING_LIST_TABLE_LAYOUT = {
   {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
@@ -5,7 +7,7 @@ local SHOPPING_LIST_TABLE_LAYOUT = {
     headerText = AUCTIONATOR_L_RESULTS_PRICE_COLUMN,
     cellTemplate = "AuctionatorShoppingPriceCellTemplate",
     cellParameters = { "minPrice" },
-    width = 128
+    width = PRICE_COLUMN_WIDTH
   },
   {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
@@ -43,8 +45,8 @@ local SHOPPING_LIST_TABLE_LAYOUT = {
     headerTemplate = "AuctionatorStringColumnHeaderTemplate",
     headerParameters = { "value" },
     headerText = AUCTIONATOR_L_RESULTS_VALUE_COLUMN,
-    cellTemplate = "AuctionatorStringCellTemplate",
-    cellParameters = { "valueDisplay" },
+    cellTemplate = "AuctionatorShoppingPriceCellTemplate",
+    cellParameters = { "valueDisplay", true },
     width = 70,
   },
   {
@@ -87,23 +89,28 @@ function AuctionatorShoppingTabDataProviderMixin:ReceiveEvent(eventName, eventDa
     local category = ...
     local getGear = Auctionator.Shopping.GetGearSuggestion
     self.isGearSearch = getGear and getGear(category) ~= nil
+    local getVendor = Auctionator.Shopping.GetVendorSuggestion
+    local vendor = getVendor and getVendor(category)
+    self.isVendorSearch = vendor ~= nil
+    self.isVendorTradeGoods = vendor and vendor.classID == Enum.ItemClass.Tradegoods
     self.showFoodStatValue = category == "Foods"
     self.groupByStat = category == "Foods" or category == "Elixirs" or category == "Potions" or category == "Burst"
-    if self.isGearSearch then
-      if not self.sortBeforeGear then
-        self.sortBeforeGear = {
+    if self.isGearSearch or self.isVendorSearch then
+      if not self.sortBeforeSpecialSearch then
+        self.sortBeforeSpecialSearch = {
           key = self.presetSort.key,
           direction = self.presetSort.direction,
           usingDefaultGroupedSort = self.usingDefaultGroupedSort,
         }
       end
-      self:SetPresetSort("value", Auctionator.Constants.SORT.ASCENDING)
+      local direction = self.isGearSearch and Auctionator.Constants.SORT.ASCENDING or Auctionator.Constants.SORT.DESCENDING
+      self:SetPresetSort("value", direction)
     else
-      if self.sortBeforeGear then
-        local previous = self.sortBeforeGear
+      if self.sortBeforeSpecialSearch then
+        local previous = self.sortBeforeSpecialSearch
         self:SetPresetSort(previous.key, previous.direction)
         self.usingDefaultGroupedSort = previous.usingDefaultGroupedSort
-        self.sortBeforeGear = nil
+        self.sortBeforeSpecialSearch = nil
       end
       if self.groupByStat and not self.presetSort.key then
         self:UseDefaultGroupedSort()
@@ -156,7 +163,9 @@ function AuctionatorShoppingTabDataProviderMixin:PrettifyData(entries)
     entry.available = FormatLargeNumber(entry.totalQuantity)
     entry.itemLevel = entry.itemKey.itemLevel
     -- Search completion sends the same entries as the incremental updates.
-    if entry.gearUpgradePercent ~= nil then
+    if entry.vendorProfit ~= nil then
+      entry.value = entry.vendorProfit
+    elseif entry.gearUpgradePercent ~= nil then
       entry.value = entry.gearUpgradePercent or 0
       entry.valueDisplay = FormatUpgradePercent(entry.gearUpgradePercent)
     else
@@ -175,7 +184,7 @@ end
 
 function AuctionatorShoppingTabDataProviderMixin:ProcessItemKey(entry, itemKeyInfo)
   AuctionatorItemKeyLoadingMixin.ProcessItemKey(self, entry, itemKeyInfo)
-  if entry.gearUpgradePercent ~= nil then
+  if entry.gearUpgradePercent ~= nil or entry.vendorProfit ~= nil then
     return
   end
 
@@ -264,8 +273,9 @@ function AuctionatorShoppingTabDataProviderMixin:UseDefaultGroupedSort()
 end
 
 function AuctionatorShoppingTabDataProviderMixin:ClearSort()
-  if self.isGearSearch then
-    self:SetPresetSort("value", Auctionator.Constants.SORT.ASCENDING)
+  if self.isGearSearch or self.isVendorSearch then
+    local direction = self.isGearSearch and Auctionator.Constants.SORT.ASCENDING or Auctionator.Constants.SORT.DESCENDING
+    self:SetPresetSort("value", direction)
     self:Sort(self.presetSort.key, self.presetSort.direction)
   elseif self.groupByStat then
     self:UseDefaultGroupedSort()
@@ -341,7 +351,34 @@ function AuctionatorShoppingTabDataProviderMixin:GetForcedHiddenColumns()
   return self.isGearSearch and gearHiddenColumns or nil
 end
 
+local vendorColumnHideStates = {
+  [AUCTIONATOR_L_RESULTS_PRICE_COLUMN] = false,
+  [AUCTIONATOR_L_RESULTS_NAME_COLUMN] = false,
+  [AUCTIONATOR_L_RESULTS_VALUE_COLUMN] = false,
+  [AUCTIONATOR_L_ITEM_LEVEL] = true,
+  [AUCTIONATOR_L_OWNED_COLUMN] = true,
+  [AUCTIONATOR_L_RESULTS_AVAILABLE_COLUMN] = true,
+  [AUCTIONATOR_L_RESULTS_STAT_COLUMN] = true,
+}
+
+local vendorTradeGoodsColumnHideStates = CopyTable(vendorColumnHideStates)
+vendorTradeGoodsColumnHideStates[AUCTIONATOR_L_RESULTS_AVAILABLE_COLUMN] = false
+
+function AuctionatorShoppingTabDataProviderMixin:CanCustomiseColumns()
+  return not self.isVendorSearch
+end
+
+function AuctionatorShoppingTabDataProviderMixin:GetColumnWidth(column)
+  if self.isVendorSearch and column.headerText == AUCTIONATOR_L_RESULTS_VALUE_COLUMN then
+    return PRICE_COLUMN_WIDTH
+  end
+  return column.width
+end
+
 function AuctionatorShoppingTabDataProviderMixin:GetColumnHideStates()
+  if self.isVendorSearch then
+    return self.isVendorTradeGoods and vendorTradeGoodsColumnHideStates or vendorColumnHideStates
+  end
   return Auctionator.Config.Get(Auctionator.Config.Options.COLUMNS_SHOPPING)
 end
 

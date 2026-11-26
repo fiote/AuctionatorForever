@@ -468,8 +468,37 @@ function Auctionator.Shopping.GetGearSuggestion(category)
   return gearByCategory[category]
 end
 
-local function NewSuggestions()
+local vendorByCategory = {
+  VendorTrash = { name = "Trash", quality = Enum.ItemQuality.Poor },
+  VendorCommon = { name = "Common - ALL", quality = Enum.ItemQuality.Common },
+  VendorCommonTradeGoods = {
+    name = "Common - Trade Goods", quality = Enum.ItemQuality.Common, classID = Enum.ItemClass.Tradegoods, order = 1,
+  },
+  VendorUncommon = { name = "Uncommon - ALL", quality = Enum.ItemQuality.Uncommon },
+  VendorUncommonWeapons = {
+    name = "Uncommon - Weapons", quality = Enum.ItemQuality.Uncommon, classID = Enum.ItemClass.Weapon, order = 1,
+  },
+  VendorUncommonArmors = {
+    name = "Uncommon - Armors", quality = Enum.ItemQuality.Uncommon, classID = Enum.ItemClass.Armor, order = 2,
+  },
+  VendorUncommonTradeGoods = {
+    name = "Uncommon - Trade Goods", quality = Enum.ItemQuality.Uncommon, classID = Enum.ItemClass.Tradegoods, order = 3,
+  },
+  VendorRare = { name = "Rare", quality = Enum.ItemQuality.Rare },
+  VendorEpic = { name = "Epic", quality = Enum.ItemQuality.Epic },
+}
+
+function Auctionator.Shopping.GetVendorSuggestion(category)
+  return vendorByCategory[category]
+end
+
+local function NewSuggestions(includeVendor)
   local suggestions = {}
+  if includeVendor then
+    for category in pairs(vendorByCategory) do
+      suggestions[category] = {}
+    end
+  end
   for category in pairs(gearByCategory) do
     suggestions[category] = {}
   end
@@ -477,7 +506,7 @@ local function NewSuggestions()
 end
 
 local function BuildSuggestions(scan, level)
-  local suggestions, seen = NewSuggestions(), {}
+  local suggestions, seen = NewSuggestions(true), {}
   local firstAidRank = math.max(GetSkillRank(firstAidSkillLine), GetSkillRank(foreverFirstAidSkillLine))
   local potionResources = { Health = true }
   local maxMana = UnitPowerMax("player", Enum.PowerType.Mana)
@@ -586,7 +615,7 @@ function Auctionator.Shopping.GenerateSuggestions(silent)
   if not currentScan then
     local items = GetSavedSuggestionItems()
     if not items then
-      Auctionator.Shopping.ListManager:UpdateSuggestedLists(NewSuggestions())
+      Auctionator.Shopping.ListManager:UpdateSuggestedLists(NewSuggestions(true))
       if not silent then
         Auctionator.Utilities.Message(AUCTIONATOR_L_GENERATE_SUGGESTIONS_NO_SCAN)
       end
@@ -664,6 +693,11 @@ local function GetArmorSubclass(level)
 end
 
 function Auctionator.Shopping.GetSuggestedSearchFilters(category)
+  local vendor = vendorByCategory[category]
+  if vendor then
+    local filters = vendor.classID and { { classID = vendor.classID } } or nil
+    return filters, nil, vendor.quality
+  end
   local gear = gearByCategory[category]
   if gear then
     local level = UnitLevel("player")
@@ -791,7 +825,69 @@ local function FilterGearUpgrades(gear, rows, callback, scale)
   CheckRows()
 end
 
+local function FilterVendorProfit(vendor, rows, callback)
+  local accepted = {}
+  local waiting, finished = 1, false
+
+  local function Finish()
+    if finished then
+      return
+    end
+    finished = true
+    local results = {}
+    for index, row in ipairs(rows) do
+      if accepted[index] then
+        table.insert(results, row)
+      end
+    end
+    callback(results)
+  end
+
+  local function CheckPrice(index, row)
+    if finished then
+      return
+    end
+    local info = { C_Item.GetItemInfo(row.itemKey.itemID) }
+    local sellPrice = info[Auctionator.Constants.ITEM_INFO.SELL_PRICE]
+    if info[3] == vendor.quality and sellPrice
+        and (not vendor.classID or info[Auctionator.Constants.ITEM_INFO.CLASS] == vendor.classID) then
+      local profit = sellPrice - row.minPrice
+      local withinTradeGoodsTolerance = vendor.classID == Enum.ItemClass.Tradegoods
+        and profit * 100 >= -row.minPrice
+      if profit > 0 or withinTradeGoodsTolerance then
+        row.vendorProfit = profit
+        accepted[index] = true
+      end
+    end
+    waiting = waiting - 1
+    if waiting == 0 then
+      Finish()
+    end
+  end
+
+  for index, row in ipairs(rows) do
+    local itemID = row.itemKey and row.itemKey.itemID
+    if itemID and itemID > 0 and (row.totalQuantity or 0) > 0 and (row.minPrice or 0) > 0 then
+      waiting = waiting + 1
+      Item:CreateFromItemID(itemID):ContinueOnItemLoad(function()
+        CheckPrice(index, row)
+      end)
+    end
+  end
+  waiting = waiting - 1
+  if waiting == 0 then
+    Finish()
+  else
+    C_Timer.After(3, Finish)
+  end
+end
+
 function Auctionator.Shopping.FilterSuggestedSearchResults(category, rows, callback, gearScale)
+  local vendor = vendorByCategory[category]
+  if vendor then
+    FilterVendorProfit(vendor, rows, callback)
+    return
+  end
   local gear = gearByCategory[category]
   if gear then
     FilterGearUpgrades(gear, rows, callback, gearScale)

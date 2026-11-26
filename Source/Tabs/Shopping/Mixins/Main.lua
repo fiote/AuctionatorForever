@@ -100,17 +100,18 @@ end
 function AuctionatorShoppingTabFrameMixin:SearchShoppingList(list)
   local getFilters = Auctionator.Shopping.GetSuggestedSearchFilters
   local category = list:GetSuggestedCategory()
-  local filters, maxLevel
+  local filters, maxLevel, quality
   if category and getFilters then
-    filters, maxLevel = getFilters(category)
+    filters, maxLevel, quality = getFilters(category)
   end
-  if filters then
+  if filters or quality ~= nil then
     local getGear = Auctionator.Shopping.GetGearSuggestion
     local gear = getGear and getGear(category)
     local gearScale = gear and self.useAlternateGearScale and Auctionator.Shopping.GetAlternateGearScale()
-    local term = maxLevel and Auctionator.Search.ReconstituteAdvancedSearch({
+    local term = (maxLevel or quality ~= nil) and Auctionator.Search.ReconstituteAdvancedSearch({
       searchString = "",
       maxLevel = maxLevel,
+      quality = quality,
     }) or ""
     self:DoSearch({ term }, {
       itemClassFilters = filters,
